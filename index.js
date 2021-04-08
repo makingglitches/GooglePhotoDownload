@@ -630,7 +630,7 @@ async function getpairedlist(authToken, paths) {
 
 	// these will only be used here
 	var namesonly = files.map(function(val) {
-		return path.basename(val);
+		return path.basename(val.toString());
 	});
 
 	// var testlocal =[];
@@ -660,25 +660,28 @@ async function getpairedlist(authToken, paths) {
 		var conta = namesonly.indexOf(a.filename) > -1;
 		var contb = namesonly.indexOf(b.filename) > -1;
 
-		if (conta > -1 && sta > -1) {
-			if (path.basename(files[conta]) != namesonly[conta]) {
-				console.log('Files at index: ' + conta + " don't match !");
+		var contai = namesonly.indexOf(a.filename);
+		var contbi = namesonly.indexOf(b.filename);
+
+		if (conta && sta > -1) {
+			if (path.basename(files[contai].toString()) != namesonly[contai]) {
+				console.log('Files at index: ' + contai + " don't match !");
 				throw new exception('error with files. pausing.');
 			}
 
-			var stat = fs.statSync(files[conta]);
+			var stat = fs.statSync(files[contai]);
 			stored[sta].originalsize = stat.size;
 
 			writeStored();
 		}
 
-		if (contab > -1 && stb > -1) {
-			if (path.basename(files[contb]) != namesonly[contb]) {
-				console.log('Files at index: ' + contab + " don't match !");
+		if (contb && stb > -1) {
+			if (path.basename(files[contbi].toString()) != namesonly[contbi]) {
+				console.log('Files at index: ' + contbi + " don't match !");
 				throw new exception('error with files. pausing.');
 			}
 
-			var stat = fs.statSync(files[contb]);
+			var stat = fs.statSync(files[contbi]);
 			stored[stb].originalsize = stat.size;
 
 			writeStored();
@@ -767,7 +770,9 @@ async function listItems(authToken) {
 				var ops = error.options;
 			});
 
-		matches = matches.concat(result.mediaItems);
+		if (result && result.mediaItems) {
+			matches = matches.concat(result.mediaItems);
+		}
 	}
 
 	for (var i in matches) {
