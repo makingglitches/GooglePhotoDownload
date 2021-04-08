@@ -1,0 +1,96 @@
+<html>
+
+<script type="text/javascript" src="/jquery.js">
+</script>
+
+<script type="text/javascript">
+
+var albums=[];
+var items=[];
+
+    $(document).ready( function()
+    {
+
+        $('#getitems').click(function()
+        {
+            $.ajax(
+                {
+                    type: 'GET',
+                    url: '/getlist',
+                    dataType: 'json',
+                    data: {},
+                    success: (data) =>
+                    {
+                        items = data;
+                        console.log("got items.");
+                    },
+                    error: (jq,tx,err) =>
+                    {
+                        console.log("get albums threw error ");
+                        console.log(tx);
+                        console.log(err);
+                    }        
+                }
+                );
+            
+        });
+
+        $('#getalbums').click(function()
+        {
+
+            $.ajax(
+                {
+                    type: 'GET',
+                    url: '/albums',
+                    dataType: 'json',
+                    data: {},
+                    success: (data) =>
+                    {
+                        albums = data;
+                        console.log("get albumns returned.");
+                    },
+                    error: (jq,tx,err) =>
+                    {
+                        console.log("get albums threw error ");
+                        console.log(tx);
+                        console.log(err);
+                    }        
+                }
+                );
+        });
+    
+        $('#grabitems').click(function()
+        {
+            $.ajax(
+                {
+                    type: 'POST',
+                    url: '/redownloadstart',
+                    dataType: 'json',
+                    data:  {},
+                    success: (data) =>
+                    {
+                        console.log("kicked off server side download job.");
+                    },
+                    error: (jq,tx,err) =>
+                    {
+                        console.log("download job error ");
+                        console.log(tx);
+                        console.log(err);
+                    }        
+                }
+                );
+
+        });
+        
+    }
+    );
+</script>
+
+<body>
+    Success !<br>
+    <a id="getalbums" href="javascript:void(0)">Click to retrieve albums</a><br>
+    <a id="getitems" href="javascript:void(0)">Click to retrieve photo list</a><br>
+    <a id="grabitems" href="javascript:void(0)">Click to re-download items</a>
+</body>
+
+</html>
