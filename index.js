@@ -120,67 +120,67 @@ app.post('/redownloadstart', async (req, res) => {
 		res.status(500).send('Problem, need to load a list of photo api mediaitems first.');
 	}
 
-	if (!fs.existsSync('canbeskipped.json')) {
-		writeCanBe();
-	}
+	//if (!fs.existsSync('canbeskipped.json')) {
+//		writeCanBe();
+//	}
 
-	canbeskipped = JSON.parse(fs.readFileSync('canbeskipped.json'));
+//	canbeskipped = JSON.parse(fs.readFileSync('canbeskipped.json'));
 
-	canbeskipped.sort((a, b) => {
-		if (a.filename < b.filename) return -1;
-		else if (a.filename == b.filename) return 0;
-		else return 1;
-	});
+	// canbeskipped.sort((a, b) => {
+	// 	if (a.filename < b.filename) return -1;
+	// 	else if (a.filename == b.filename) return 0;
+	// 	else return 1;
+	// });
 
-	writeCanBe();
+//	writeCanBe();
 
 	for (var i in pairs.gitems) {
 		console.log('At index ' + i + ' of ' + pairs.gitems.length);
 
 		var item = pairs.gitems[i];
-		var canbeitem = null;
+	//	var canbeitem = null;
 
 		// retrieve item from itemstore
 		var storeindex = searchstore(item.id);
 		var storeitem = stored[storeindex];
 
 		// find item.
-		for (var c in canbeskipped) {
-			if (canbeskipped[c].filename == item.filename) {
-				canbeitem = canbeskipped[c];
-				break;
-			}
-		}
+		// for (var c in canbeskipped) {
+		// 	if (canbeskipped[c].filename == item.filename) {
+		// 		canbeitem = canbeskipped[c];
+		// 		break;
+		// 	}
+		// }
 
-		// if it exists and is the stored size it can be  skipped, go to the next
-		if (canbeitem) {
-			if (fs.existsSync(canbeitem.destfilename)) {
-				var s = fs.statSync(canbeitem.destfilename);
+		// // if it exists and is the stored size it can be  skipped, go to the next
+		// if (canbeitem) {
+		// 	if (fs.existsSync(canbeitem.destfilename)) {
+		// 		var s = fs.statSync(canbeitem.destfilename);
 
-				if (canbeitem.size && canbeitem.size == s.size) {
-					stored[storeindex].size = canbeitem.size;
-					stored[storeindex].finished = true;
-					writeStored();
-					console.log('skipping: ' + item.filename);
-					continue;
-				}
-				else {
-					canbeskipped.splice(canbeskipped.indexOf(canbeitem), 1);
-					writeCanBe();
-				}
-			}
-			else {
-				canbeskipped.splice(canbeskipped.indexOf(canbeitem), 1);
-				writeCanBe();
-			}
-		}
+		// 		if (canbeitem.size && canbeitem.size == s.size) {
+		// 			stored[storeindex].size = canbeitem.size;
+		// 			stored[storeindex].finished = true;
+		// 			writeStored();
+		// 			console.log('skipping: ' + item.filename);
+		// 			continue;
+		// 		}
+		// 		else {
+		// 			canbeskipped.splice(canbeskipped.indexOf(canbeitem), 1);
+		// 			writeCanBe();
+		// 		}
+		// 	}
+		// 	else {
+		// 		canbeskipped.splice(canbeskipped.indexOf(canbeitem), 1);
+		// 		writeCanBe();
+		// 	}
+		// }
 
 		// download headers have not been pulled back if expected size is -1
 		if (!storeitem.size || storeitem.size == -1) {
 			await updateSize(req.user.token, storeitem, 5);
 		}
 
-		var destfilename = pulldir + '\\' + item.filename;
+		var destfilename = pulldir + "/" + item.filename;
 
 		// check if the download appears to be done.
 		if (fs.existsSync(destfilename)) {
@@ -192,8 +192,8 @@ app.post('/redownloadstart', async (req, res) => {
 				storeitem.finished = true;
 				writeStored();
 
-				addcanbe(item.filename, destfilename, storeitem.size);
-				writeCanBe();
+			//	addcanbe(item.filename, destfilename, storeitem.size);
+			//	writeCanBe();
 
 				console.log('File ' + item.filename + ' already finished');
 			}
@@ -215,9 +215,8 @@ app.post('/redownloadstart', async (req, res) => {
 			}
 		}
 
-		console.log('sent to queue.');
 
-		pushtoQueue(destfilename, storeitem, req.user.token);
+		if (!storeitem.finished) pushtoQueue(destfilename, storeitem, req.user.token);
 	}
 
 	endtimer = true;
@@ -256,8 +255,8 @@ app.get('/getlist', async (req, res) => {
 		pairs.onserver = onserver;
 		pairs.localonly = localonly;
 
-		moveItems(pairs.onserver, 'C:\\Users\\John\\Desktop\\Combined Photos etc\\mp4sonserver');
-		moveItems(pairs.localonly, 'C:\\Users\\John\\Desktop\\Combined Photos etc\\mp4locals');
+		moveItems(pairs.onserver, onserverdir);
+		moveItems(pairs.localonly, localdir);
 
 		res.status(200).send(pairs);
 
@@ -311,6 +310,8 @@ server.listen(config.port, () => {
 });
 
 function pushtoQueue(destfilename, storeitem, authToken) {
+	
+	console.log('sent to queue.');
 	waiting.push({ filename: destfilename, item: storeitem, authToken: authToken });
 }
 
@@ -389,8 +390,8 @@ async function startJob(destfilename, storeitem, authToken) {
 		this.storeitem.finished = true;
 		writeStored();
 
-		addcanbe(this.filename, this.destination, this.expectedSize);
-		writeCanBe();
+	//	addcanbe(this.filename, this.destination, this.expectedSize);
+	//	writeCanBe();
 
 		pipes.splice(pipes.indexOf(this), 1);
 	});
@@ -517,10 +518,10 @@ function recursepath(path) {
 
 	for (var i in dir) {
 		if (dir[i].isFile()) {
-			files.push(path + '\\' + dir[i].name.toString());
+			files.push(path + '/' + dir[i].name.toString());
 		}
 		else {
-			files = files.concat(recursepath(path + '\\' + dir[i].name));
+			files = files.concat(recursepath(path + '/' + dir[i].name));
 		}
 	}
 
@@ -554,32 +555,35 @@ async function getitem(authToken, id, maxretries = 5) {
 	return result;
 }
 
-function addcanbe(filename, destfilename, size) {
-	canbeskipped.push({ filename: filename, destfilename: destfilename, size: size });
-}
+// function addcanbe(filename, destfilename, size) {
+// 	canbeskipped.push({ filename: filename, destfilename: destfilename, size: size });
+// }
 
-function writeCanBe() {
-	fs.writeFileSync('canbeskipped.json', JSON.stringify(canbeskipped));
-}
+// function writeCanBe() {
+// 	fs.writeFileSync('canbeskipped.json', JSON.stringify(canbeskipped));
+// }
 
 var maxpipes = 5;
 var pipes = [];
 var waiting = [];
-var canbeskipped = [];
+//var canbeskipped = [];
 
 var endtimer = false;
 const fasttest = false;
-const localdir = 'C:\\Users\\John\\Desktop\\Combined Photos etc\\mp4locals';
-const onserverdir = 'C:\\Users\\John\\Desktop\\Combined Photos etc\\mp4sonserver';
+const localdir = "/Data/Desktop/Combined Photos etc/mp4locals";
+//'C:\\Users\\John\\Desktop\\Combined Photos etc\\mp4locals';
+const onserverdir = "/Data/Desktop/Combined Photos etc/mp4sonserver";
+//'C:\\Users\\John\\Desktop\\Combined Photos etc\\mp4sonserver';
 const othersourcedir = '';
-const pulldir = 'C:\\Users\\John\\Desktop\\Combined Photos etc\\mp4spulled';
+const pulldir = "/Data/Desktop/Combined Photos etc/mp4spulled";
+//'C:\\Users\\John\\Desktop\\Combined Photos etc\\mp4spulled';
 
 var pairs = {};
 var stored = [];
 
 function moveItems(files, dest) {
 	for (var i in files) {
-		var newname = dest + '\\' + path.basename(files[i]);
+		var newname = dest + '/' + path.basename(files[i]);
 
 		if (files[i] == newname) {
 			continue;
