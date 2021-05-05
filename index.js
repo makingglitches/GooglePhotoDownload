@@ -107,8 +107,7 @@ app.get('/', (req, res) => {
 	if (!req.user || !req.isAuthenticated()) {
 		console.log('sending user to authenticate page.');
 		res.redirect('/auth/google');
-	}
-	else {
+	} else {
 		console.log('sending user to sucess page');
 
 		res.sendFile(__dirname + '/success.html');
@@ -120,8 +119,7 @@ app.post('/redownloadstart', async (req, res) => {
 		endtimer = false;
 
 		timecall();
-	}
-	else {
+	} else {
 		res.status(500).send('Problem, need to load a list of photo api mediaitems first.');
 	}
 
@@ -139,7 +137,7 @@ app.post('/redownloadstart', async (req, res) => {
 			await updateSize(config.atoken.access_token, storeitem, 5);
 		}
 
-		var destfilename = pulldir + "/" + item.filename;
+		var destfilename = pulldir + '/' + item.filename;
 
 		// check if the download appears to be done.
 		if (fs.existsSync(destfilename)) {
@@ -151,10 +149,8 @@ app.post('/redownloadstart', async (req, res) => {
 				storeitem.finished = true;
 				writeStored();
 
-
 				console.log('File ' + item.filename + ' already finished');
-			}
-			else {
+			} else {
 				// remove the file and start again
 				storeitem.finished = false;
 				writeStored();
@@ -163,15 +159,13 @@ app.post('/redownloadstart', async (req, res) => {
 
 				if (stat.size == 0) {
 					console.log('Has size 0, deleteing');
-				}
-				else {
+				} else {
 					console.log('Has unmatched sizes, deleting');
 				}
 
 				fs.rmSync(destfilename);
 			}
 		}
-
 
 		if (!storeitem.finished) pushtoQueue(destfilename, storeitem, config.atoken.access_token);
 	}
@@ -184,10 +178,7 @@ app.get('/getlist', async (req, res) => {
 		// less than optimal is where it doesnt check length.
 		// unfortunately how can it without downloading every item if fucking google doesnt expose that field ?
 
-		pairs = await getpairedlist(config.atoken.access_token, [
-			localdir,
-			onserverdir
-		]);
+		pairs = await getpairedlist(config.atoken.access_token, [ localdir, onserverdir ]);
 
 		var onserver = [];
 		var localonly = [];
@@ -203,8 +194,7 @@ app.get('/getlist', async (req, res) => {
 
 			if (f > -1) {
 				onserver.push(pairs.localfiles[i].toString());
-			}
-			else {
+			} else {
 				localonly.push(pairs.localfiles[i].toString());
 			}
 		}
@@ -215,7 +205,7 @@ app.get('/getlist', async (req, res) => {
 		moveItems(pairs.onserver, onserverdir);
 		moveItems(pairs.localonly, localdir);
 
-		res.status(200).send({message:"completed", server:pairs.onserver.length, local:pairs.localonly.length});
+		res.status(200).send({ message: 'completed', server: pairs.onserver.length, local: pairs.localonly.length });
 
 		console.log('sent item info to client');
 	}
@@ -227,19 +217,22 @@ app.get('/logout', (req, res) => {
 	res.redirect('/');
 });
 
-function acallback(arg1,arg2,arg3,arg4)
-{
-	console.log("reached auth callback");
+function acallback(arg1, arg2, arg3, arg4) {
+	console.log('reached auth callback');
 }
 
 // Start the OAuth login process for Google.
 app.get(
 	'/auth/google',
-	passport.authenticate('google', {
-		scope: config.scopes,
-		failureFlash: true, // Display errors to the user.
-		session: true
-	}, acallback )
+	passport.authenticate(
+		'google',
+		{
+			scope: config.scopes,
+			failureFlash: true, // Display errors to the user.
+			session: true
+		},
+		acallback
+	)
 );
 
 app.get('/jquery.js', (req, res) => {
@@ -250,8 +243,7 @@ app.get('/albums', async (req, res) => {
 	if (checkauth(req)) {
 		var a = await libraryApiGetAlbums(config.atoken.access_token);
 		res.status(200).send({ data: a });
-	}
-	else {
+	} else {
 		res.redirect('/auth/google');
 	}
 });
@@ -262,18 +254,16 @@ app.get(
 	(req, res) => {
 		// User has logged in.
 		console.log('User has logged in.');
-		
+
 		refreshtimerrestart();
 
 		res.redirect('/');
 	}
 );
 
-app.get('/forcerefresh', async(req,res) => {
-
+app.get('/forcerefresh', async (req, res) => {
 	var result = await refreshAccessToken();
 	res.status(200).send(result);
-
 });
 
 server.listen(config.port, () => {
@@ -282,7 +272,6 @@ server.listen(config.port, () => {
 });
 
 function pushtoQueue(destfilename, storeitem, authToken) {
-	
 	console.log('sent to queue.');
 	waiting.push({ filename: destfilename, item: storeitem, authToken: authToken });
 }
@@ -307,8 +296,7 @@ async function updateSize(authToken, storeitem, maxretries) {
 					retry = true;
 					retries++;
 					console.log('Get header failed for ' + storeitem.filename);
-				}
-				else {
+				} else {
 					storeitem.size = res.headers['content-length'];
 					writeStored();
 				}
@@ -441,10 +429,9 @@ async function timecall() {
 			rate = (pipes[i].bytesWritten - pipes[i].lastbytes) / (Date.now() - pipes[i].lastdate) / 1024 * 1000;
 		}
 
-		if (pipes[i].bytesWritten > pipes[i].storeitem.size && !pipes[i].wrote)
-		{
-			fs.appendFileSync("mismatched.txt",pipes[i].filename+"\n");
-			pipes[i].wrote=true;
+		if (pipes[i].bytesWritten > pipes[i].storeitem.size && !pipes[i].wrote) {
+			fs.appendFileSync('mismatched.txt', pipes[i].filename + '\n');
+			pipes[i].wrote = true;
 		}
 
 		var perc = pipes[i].bytesWritten / pipes[i].storeitem.size * 100;
@@ -478,8 +465,7 @@ async function timecall() {
 	if (endtimer && waiting.length == 0 && pipes.length == 0) {
 		// have to fix the requestpromise crap so that retry logic can be handled
 		console.log('stopping timer');
-	}
-	else {
+	} else {
 		setTimeout(() => {
 			timecall();
 		}, 5000);
@@ -494,8 +480,7 @@ function recursepath(path) {
 	for (var i in dir) {
 		if (dir[i].isFile()) {
 			files.push(path + '/' + dir[i].name.toString());
-		}
-		else {
+		} else {
 			files = files.concat(recursepath(path + '/' + dir[i].name));
 		}
 	}
@@ -537,12 +522,12 @@ var waiting = [];
 
 var endtimer = false;
 const fasttest = false;
-const localdir = "/Data/Desktop/Combined Photos etc/mp4locals";
+const localdir = '/Data/Desktop/Combined Photos etc/mp4locals';
 //'C:\\Users\\John\\Desktop\\Combined Photos etc\\mp4locals';
-const onserverdir = "/Data/Desktop/Combined Photos etc/mp4sonserver";
+const onserverdir = '/Data/Desktop/Combined Photos etc/mp4sonserver';
 //'C:\\Users\\John\\Desktop\\Combined Photos etc\\mp4sonserver';
 const othersourcedir = '';
-const pulldir = "/Data/Desktop/Combined Photos etc/mp4spulled";
+const pulldir = '/Data/Desktop/Combined Photos etc/mp4spulled';
 //'C:\\Users\\John\\Desktop\\Combined Photos etc\\mp4spulled';
 
 var pairs = {};
@@ -589,6 +574,8 @@ async function getpairedlist(authToken, paths) {
 
 	var files = [];
 
+	console.log('recursing local store');
+
 	for (var i in paths) {
 		files = files.concat(recursepath(paths[i]));
 	}
@@ -599,12 +586,13 @@ async function getpairedlist(authToken, paths) {
 
 	console.log('got info on ' + result.length + ' items.');
 
+	console.log('extracting basenames of files on disk.');
 	// these will only be used here
 	var namesonly = files.map(function(val) {
 		return path.basename(val.toString());
 	});
 
-
+	console.log('search by undownloaded and original file on disk.');
 	// sort the gitems array in pairs.
 	// if originals are on server already, to save disk space download these first.
 	// so they can be compared and deleted.
@@ -650,36 +638,28 @@ async function getpairedlist(authToken, paths) {
 		// if the first file is contained and the second is not, it gets sorted up
 		if (conta && !contb) {
 			return -1;
-		}
-		else if (!conta && contb) {
+		} else if (!conta && contb) {
 			// if the first file is not contained in local files and second file is, sort down
 			return 1;
-		}
-		else if (conta == contb) {
+		} else if (conta == contb) {
 			// if both are either on the harddisk or not on the hardisk, sort by filename.
 			if (sta > -1 && stb > -1) {
 				// if the size field is set in the first sort it upwards...
 				if (stored[sta].size > -1 && stored[stb].size == -1) {
 					return -1;
-				}
-				else if (stored[sta].size == -1 && stored[stb].size > -1) {
+				} else if (stored[sta].size == -1 && stored[stb].size > -1) {
 					// if the size field is not set in the first sort it downwards..
 					return 1;
-				}
-				else if (stored[sta].size < stored[stb].size) {
+				} else if (stored[sta].size < stored[stb].size) {
 					return -1;
-				}
-				else if (stored[sta].size > stored[stb].size) {
+				} else if (stored[sta].size > stored[stb].size) {
 					return 1;
 				}
-			}
-			else if (a.filename < b.filename) {
+			} else if (a.filename < b.filename) {
 				return -1;
-			}
-			else if (a.filename > b.filename) {
+			} else if (a.filename > b.filename) {
 				return 1;
-			}
-			else {
+			} else {
 				return 0;
 			}
 		}
@@ -742,7 +722,7 @@ async function listItems(authToken) {
 	}
 
 	writeStored();
-	
+
 	loadandsortStored();
 
 	console.log('returning items.');
@@ -794,60 +774,44 @@ async function libraryApiGetAlbums(authToken) {
 	return { albums, error };
 }
 
-
-
-
 //https://developers.google.com/identity/protocols/oauth2/web-server#httprest_1
 
-async function refreshAccessToken()
-{
-
-
-	console.log("Updating Access Token.")
+async function refreshAccessToken() {
+	console.log('Updating Access Token.');
 
 	var parameters = {
-		client_id:config.oAuthClientID,
-		client_secret:config.oAuthclientSecret,
-		refresh_token:fs.readFileSync('rtoken.txt').toString(),
-		grant_type:'refresh_token'
-	}
-
-
+		client_id: config.oAuthClientID,
+		client_secret: config.oAuthclientSecret,
+		refresh_token: fs.readFileSync('rtoken.txt').toString(),
+		grant_type: 'refresh_token'
+	};
 
 	const result = await request.post(config.refreshAcessApiEndpoint, {
-	//	headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-		form: querystring.stringify( parameters)
-	//	json: true,
-	//	auth: { bearer: authToken }
+		//	headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+		form: querystring.stringify(parameters)
+		//	json: true,
+		//	auth: { bearer: authToken }
 	});
-
 
 	// this needs to be where we store the f-ing auth token, fuck passport past the initial crap
 	config.atoken = JSON.parse(result);
-	config.atoken.expiretime = Date.now()+atoken.expires_in*1000;
-	
+	config.atoken.expiretime = Date.now() + atoken.expires_in * 1000;
 
 	refreshtimerrestart();
 
 	return result;
-
 }
 
-function refreshtimerrestart()
-{
-
-	if ( config.refreshHandle > -1)
-	{
-		console.log("Shutting down refresh timer.")
+function refreshtimerrestart() {
+	if (config.refreshHandle > -1) {
+		console.log('Shutting down refresh timer.');
 		clearTimeout(config.refreshHandle);
 		config.refreshHandle = -1;
 	}
 
-	config.refreshHandle=  setTimeout(() => {
+	config.refreshHandle = setTimeout(() => {
 		refreshAccessToken();
-		
-	}, config.atoken.expires_in*1000);
+	}, config.atoken.expires_in * 1000);
 
-	console.log("Started refresh timer.");
+	console.log('Started refresh timer.');
 }
-
