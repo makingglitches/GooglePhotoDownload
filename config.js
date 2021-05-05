@@ -14,13 +14,18 @@
 
 // This file contains the configuration options for this sample app.
 
+var fs = require('fs');
+
+var obj = JSON.parse( fs.readFileSync('client_id.json'));
+
+
 const config = {};
 
 // The OAuth client ID from the Google Developers console.
-config.oAuthClientID = '';
+config.oAuthClientID = obj.installed.client_id;
 
 // The OAuth client secret from the Google Developers console.
-config.oAuthclientSecret = '';
+config.oAuthclientSecret = obj.installed.client_secret;
 
 // The callback to use for OAuth requests. This is the URL where the app is
 // running. For testing and running it locally, use 127.0.0.1.

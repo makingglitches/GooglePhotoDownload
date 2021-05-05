@@ -57,6 +57,7 @@ const { waitForDebugger } = require('inspector');
 const { json } = require('express');
 const { WSAENOTSOCK } = require('constants');
 const { exception } = require('console');
+
 auth(passport);
 
 // Set up a session middleware to handle user sessions.
@@ -120,60 +121,14 @@ app.post('/redownloadstart', async (req, res) => {
 		res.status(500).send('Problem, need to load a list of photo api mediaitems first.');
 	}
 
-	//if (!fs.existsSync('canbeskipped.json')) {
-//		writeCanBe();
-//	}
-
-//	canbeskipped = JSON.parse(fs.readFileSync('canbeskipped.json'));
-
-	// canbeskipped.sort((a, b) => {
-	// 	if (a.filename < b.filename) return -1;
-	// 	else if (a.filename == b.filename) return 0;
-	// 	else return 1;
-	// });
-
-//	writeCanBe();
-
 	for (var i in pairs.gitems) {
 		console.log('At index ' + i + ' of ' + pairs.gitems.length);
 
 		var item = pairs.gitems[i];
-	//	var canbeitem = null;
 
 		// retrieve item from itemstore
 		var storeindex = searchstore(item.id);
 		var storeitem = stored[storeindex];
-
-		// find item.
-		// for (var c in canbeskipped) {
-		// 	if (canbeskipped[c].filename == item.filename) {
-		// 		canbeitem = canbeskipped[c];
-		// 		break;
-		// 	}
-		// }
-
-		// // if it exists and is the stored size it can be  skipped, go to the next
-		// if (canbeitem) {
-		// 	if (fs.existsSync(canbeitem.destfilename)) {
-		// 		var s = fs.statSync(canbeitem.destfilename);
-
-		// 		if (canbeitem.size && canbeitem.size == s.size) {
-		// 			stored[storeindex].size = canbeitem.size;
-		// 			stored[storeindex].finished = true;
-		// 			writeStored();
-		// 			console.log('skipping: ' + item.filename);
-		// 			continue;
-		// 		}
-		// 		else {
-		// 			canbeskipped.splice(canbeskipped.indexOf(canbeitem), 1);
-		// 			writeCanBe();
-		// 		}
-		// 	}
-		// 	else {
-		// 		canbeskipped.splice(canbeskipped.indexOf(canbeitem), 1);
-		// 		writeCanBe();
-		// 	}
-		// }
 
 		// download headers have not been pulled back if expected size is -1
 		if (!storeitem.size || storeitem.size == -1) {
@@ -192,8 +147,6 @@ app.post('/redownloadstart', async (req, res) => {
 				storeitem.finished = true;
 				writeStored();
 
-			//	addcanbe(item.filename, destfilename, storeitem.size);
-			//	writeCanBe();
 
 				console.log('File ' + item.filename + ' already finished');
 			}
@@ -258,9 +211,9 @@ app.get('/getlist', async (req, res) => {
 		moveItems(pairs.onserver, onserverdir);
 		moveItems(pairs.localonly, localdir);
 
-		res.status(200).send(pairs);
+		res.status(200).send({message:"completed", server:pairs.onserver.length, local:pairs.localonly.length});
 
-		console.log('sent items to client');
+		console.log('sent item info to client');
 	}
 });
 
@@ -270,6 +223,11 @@ app.get('/logout', (req, res) => {
 	res.redirect('/');
 });
 
+function acallback(arg1,arg2,arg3,arg4)
+{
+	console.log("reached auth callback");
+}
+
 // Start the OAuth login process for Google.
 app.get(
 	'/auth/google',
@@ -277,7 +235,7 @@ app.get(
 		scope: config.scopes,
 		failureFlash: true, // Display errors to the user.
 		session: true
-	})
+	}, acallback )
 );
 
 app.get('/jquery.js', (req, res) => {
@@ -390,9 +348,6 @@ async function startJob(destfilename, storeitem, authToken) {
 		this.storeitem.finished = true;
 		writeStored();
 
-	//	addcanbe(this.filename, this.destination, this.expectedSize);
-	//	writeCanBe();
-
 		pipes.splice(pipes.indexOf(this), 1);
 	});
 
@@ -470,6 +425,12 @@ async function timecall() {
 
 		if (pipes[i].lastbytes) {
 			rate = (pipes[i].bytesWritten - pipes[i].lastbytes) / (Date.now() - pipes[i].lastdate) / 1024 * 1000;
+		}
+
+		if (pipes[i].bytesWritten > pipes[i].storeitem.size && !pipes[i].wrote)
+		{
+			fs.appendFileSync("mismatched.txt",pipes[i].filename+"\n");
+			pipes[i].wrote=true;
 		}
 
 		var perc = pipes[i].bytesWritten / pipes[i].storeitem.size * 100;
@@ -555,14 +516,6 @@ async function getitem(authToken, id, maxretries = 5) {
 	return result;
 }
 
-// function addcanbe(filename, destfilename, size) {
-// 	canbeskipped.push({ filename: filename, destfilename: destfilename, size: size });
-// }
-
-// function writeCanBe() {
-// 	fs.writeFileSync('canbeskipped.json', JSON.stringify(canbeskipped));
-// }
-
 var maxpipes = 5;
 var pipes = [];
 var waiting = [];
@@ -637,20 +590,6 @@ async function getpairedlist(authToken, paths) {
 		return path.basename(val.toString());
 	});
 
-	// var testlocal =[];
-
-	// for (var i in namesonly)
-	// {
-	// 	for (var j in result)
-	// 	{
-	// 		if (namesonly[i]==result[j].filename)
-	// 		{
-	// 			testlocal.push(result[j]);
-	// 			break;
-	// 		}
-	// 	}
-
-	// }
 
 	// sort the gitems array in pairs.
 	// if originals are on server already, to save disk space download these first.
@@ -750,12 +689,6 @@ async function listItems(authToken) {
 		auth: { bearer: authToken }
 	});
 
-	// .catch(function(err)
-	// {
-	// 	console.log(err);
-	// 	var ops = err.options;
-	// });
-
 	var matches = [];
 
 	matches = matches.concat(result.mediaItems);
@@ -838,9 +771,6 @@ async function libraryApiGetAlbums(authToken) {
 			// returned.
 		} while (parameters.pageToken != null);
 	} catch (err) {
-		// If the error is a StatusCodeError, it contains an error.error object that
-		// should be returned. It has a name, statuscode and message in the correct
-		// format. Otherwise extract the properties.
 		error = err.error.error || { name: err.name, code: err.statusCode, message: err.message };
 		console.log(error);
 	}
