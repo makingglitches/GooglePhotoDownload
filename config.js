@@ -21,6 +21,11 @@ var obj = JSON.parse( fs.readFileSync('client_id.json'));
 
 const config = {};
 
+
+config.refreshHandle=-1;
+
+config.atoken ={};
+
 // The OAuth client ID from the Google Developers console.
 config.oAuthClientID = obj.installed.client_id;
 
@@ -52,5 +57,7 @@ config.albumPageSize = 50;
 
 // The API end point to use. Do not change.
 config.apiEndpoint = 'https://photoslibrary.googleapis.com';
+
+config.refreshAcessApiEndpoint = 'https://oauth2.googleapis.com/token';
 
 module.exports = config;

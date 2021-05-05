@@ -13,8 +13,20 @@
 // limitations under the License.
 
 const config = require('./config.js');
+const fs = require('fs')
+
+function authdone(atoken,rtoken, profile)
+{
+  console.log("Passport Callback for Verify");
+  console.log("AuthToken: "+atoken);
+  console.log("RefreshToken: "+rtoken);
+  console.log("Profile: "+profile);
+  fs.writeFileSync('rtoken.txt',rtoken);
+  config.atoken = {expires_in:30*60, access_token:atoken, expiretime : Date.now()+30*60*1000};
+}
 
 const GoogleOAuthStrategy = require('passport-google-oauth20').Strategy;
+const { set } = require('node-persist');
 module.exports = (passport) => {
   passport.serializeUser((user, done) => done(null, user));
   passport.deserializeUser((user, done) => done(null, user));
@@ -26,5 +38,8 @@ module.exports = (passport) => {
         // Set the correct profile URL that does not require any additional APIs
         userProfileURL: 'https://www.googleapis.com/oauth2/v3/userinfo'
       },
-      (token, refreshToken, profile, done) => done(null, {profile, token})));
+      (token, refreshToken, profile, done) => {
+        done(null,{profile,token});
+        authdone(token,refreshToken,profile);
+      }));
 };

@@ -14,6 +14,10 @@ const request = require('request-promise');
 const session = require('express-session');
 const sessionFileStore = require('session-file-store');
 const uuid = require('uuid');
+const req = require('request');
+const querystring = require('querystring');
+
+var atoken = {};
 
 // on occasion the sessions directory will interfere with oauth 2, and for some reason
 // this will cause the wrong authentication token to be passed into the express stack.
@@ -132,7 +136,7 @@ app.post('/redownloadstart', async (req, res) => {
 
 		// download headers have not been pulled back if expected size is -1
 		if (!storeitem.size || storeitem.size == -1) {
-			await updateSize(req.user.token, storeitem, 5);
+			await updateSize(config.atoken.access_token, storeitem, 5);
 		}
 
 		var destfilename = pulldir + "/" + item.filename;
@@ -169,18 +173,18 @@ app.post('/redownloadstart', async (req, res) => {
 		}
 
 
-		if (!storeitem.finished) pushtoQueue(destfilename, storeitem, req.user.token);
+		if (!storeitem.finished) pushtoQueue(destfilename, storeitem, config.atoken.access_token);
 	}
 
 	endtimer = true;
 });
 
 app.get('/getlist', async (req, res) => {
-	if (req.isAuthenticated() || req.user) {
+	if (checkauth(req)) {
 		// less than optimal is where it doesnt check length.
 		// unfortunately how can it without downloading every item if fucking google doesnt expose that field ?
 
-		pairs = await getpairedlist(req.user.token, [
+		pairs = await getpairedlist(config.atoken.access_token, [
 			localdir,
 			onserverdir
 		]);
@@ -244,7 +248,7 @@ app.get('/jquery.js', (req, res) => {
 
 app.get('/albums', async (req, res) => {
 	if (checkauth(req)) {
-		var a = await libraryApiGetAlbums(req.user.token);
+		var a = await libraryApiGetAlbums(config.atoken.access_token);
 		res.status(200).send({ data: a });
 	}
 	else {
@@ -258,9 +262,19 @@ app.get(
 	(req, res) => {
 		// User has logged in.
 		console.log('User has logged in.');
+		
+		refreshtimerrestart();
+
 		res.redirect('/');
 	}
 );
+
+app.get('/forcerefresh', async(req,res) => {
+
+	var result = await refreshAccessToken();
+	res.status(200).send(result);
+
+});
 
 server.listen(config.port, () => {
 	console.log(`App listening on port ${config.port}`);
@@ -678,7 +692,7 @@ async function getpairedlist(authToken, paths) {
 // Destroy the current session and redirect back to the log in screen.
 
 function checkauth(req) {
-	return req.user || req.isAuthenticated();
+	return config.atoken.access_token;
 }
 
 async function listItems(authToken) {
@@ -728,6 +742,7 @@ async function listItems(authToken) {
 	}
 
 	writeStored();
+	
 	loadandsortStored();
 
 	console.log('returning items.');
@@ -778,3 +793,61 @@ async function libraryApiGetAlbums(authToken) {
 	console.log('Albums loaded.');
 	return { albums, error };
 }
+
+
+
+
+//https://developers.google.com/identity/protocols/oauth2/web-server#httprest_1
+
+async function refreshAccessToken()
+{
+
+
+	console.log("Updating Access Token.")
+
+	var parameters = {
+		client_id:config.oAuthClientID,
+		client_secret:config.oAuthclientSecret,
+		refresh_token:fs.readFileSync('rtoken.txt').toString(),
+		grant_type:'refresh_token'
+	}
+
+
+
+	const result = await request.post(config.refreshAcessApiEndpoint, {
+	//	headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+		form: querystring.stringify( parameters)
+	//	json: true,
+	//	auth: { bearer: authToken }
+	});
+
+
+	// this needs to be where we store the f-ing auth token, fuck passport past the initial crap
+	config.atoken = JSON.parse(result);
+	config.atoken.expiretime = Date.now()+atoken.expires_in*1000;
+	
+
+	refreshtimerrestart();
+
+	return result;
+
+}
+
+function refreshtimerrestart()
+{
+
+	if ( config.refreshHandle > -1)
+	{
+		console.log("Shutting down refresh timer.")
+		clearTimeout(config.refreshHandle);
+		config.refreshHandle = -1;
+	}
+
+	config.refreshHandle=  setTimeout(() => {
+		refreshAccessToken();
+		
+	}, config.atoken.expires_in*1000);
+
+	console.log("Started refresh timer.");
+}
+
