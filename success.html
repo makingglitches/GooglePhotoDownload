@@ -81,16 +81,48 @@ var items=[];
                 );
 
         });
+
+        $('#forcerefresh').click(function()
+    {
+
+        $.ajax(
+                {
+                    type: 'GET',
+                    url: '/forcerefresh',
+                    dataType: 'json',
+                    data: {},
+                    success: (data) =>
+                    {
+                        refreshdata=data;
+                        console.log("force refresh returned.");
+                    },
+                    error: (jq,tx,err) =>
+                    {
+                        console.log("get albums threw error ");
+                        console.log(tx);
+                        console.log(err);
+                    }        
+                }
+                );
+
+    });
         
     }
     );
+
+    var refreshdata = null;
+
+
+
+
 </script>
 
 <body>
     Success !<br>
     <a id="getalbums" href="javascript:void(0)">Click to retrieve albums</a><br>
     <a id="getitems" href="javascript:void(0)">Click to retrieve photo list</a><br>
-    <a id="grabitems" href="javascript:void(0)">Click to re-download items</a>
+    <a id="grabitems" href="javascript:void(0)">Click to re-download items</a><br>
+    <a id="forcerefresh" href="javascript:void(0)">Force refresh of access token</a>
 </body>
 
 </html>
