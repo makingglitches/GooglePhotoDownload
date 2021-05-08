@@ -358,6 +358,9 @@ async function startJob(destfilename, storeitem, authToken) {
 		console.log(err);
 	});
 
+
+	
+
 	var pipe = request.get(url + '=d' + storeitem.voption);
 
 	pipe.on('error', function(err) {
