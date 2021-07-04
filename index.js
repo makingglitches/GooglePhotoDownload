@@ -16,8 +16,17 @@ const sessionFileStore = require('session-file-store');
 const uuid = require('uuid');
 const req = require('request');
 const querystring = require('querystring');
+const lodash = require('lodash');
 
 var atoken = {};
+
+var d1 = 'itemstore-backup-' + Date.now() + '.json';
+
+fs.copyFileSync('itemstore.json', d1);
+
+var d1 = 'accountstores-backup-' + Date.now() + '.json';
+
+fs.copyFileSync('accountstores.json', d1);
 
 // on occasion the sessions directory will interfere with oauth 2, and for some reason
 // this will cause the wrong authentication token to be passed into the express stack.
@@ -115,6 +124,12 @@ app.get('/', (req, res) => {
 });
 
 app.post('/redownloadstart', async (req, res) => {
+	if (!pairs || !pairs.gitems) {
+		console.log('skipping online refresh getting stored items');
+		pairs = await getpairedlist(false, '', [ config.curraccount.localdirectory, config.curraccount.onserverdirectory ]);
+		processPairedList();
+	}
+
 	if (pairs) {
 		endtimer = false;
 
@@ -137,7 +152,7 @@ app.post('/redownloadstart', async (req, res) => {
 			await updateSize(config.atoken.access_token, storeitem, 5);
 		}
 
-		var destfilename = pulldir + '/' + item.filename;
+		var destfilename = config.curraccount.destdir  + '/' + item.filename;
 
 		// check if the download appears to be done.
 		if (fs.existsSync(destfilename)) {
@@ -178,32 +193,9 @@ app.get('/getlist', async (req, res) => {
 		// less than optimal is where it doesnt check length.
 		// unfortunately how can it without downloading every item if fucking google doesnt expose that field ?
 
-		pairs = await getpairedlist(config.atoken.access_token, [ localdir, onserverdir ]);
+		pairs = await getpairedlist(true, config.atoken.access_token, [ config.curraccount.localdirectory, config.curraccount.onserverdirectory ]);
 
-		var onserver = [];
-		var localonly = [];
-
-		var itemnames = pairs.gitems.map(function(v) {
-			return v.filename;
-		});
-
-		console.log('Comparing.');
-
-		for (var i in pairs.localfiles) {
-			var f = itemnames.indexOf(path.basename(pairs.localfiles[i].toString()));
-
-			if (f > -1) {
-				onserver.push(pairs.localfiles[i].toString());
-			} else {
-				localonly.push(pairs.localfiles[i].toString());
-			}
-		}
-
-		pairs.onserver = onserver;
-		pairs.localonly = localonly;
-
-		moveItems(pairs.onserver, onserverdir);
-		moveItems(pairs.localonly, localdir);
+		processPairedList();
 
 		res.status(200).send({ message: 'completed', server: pairs.onserver.length, local: pairs.localonly.length });
 
@@ -255,7 +247,14 @@ app.get(
 		// User has logged in.
 		console.log('User has logged in.');
 
+
 		refreshtimerrestart();
+
+		config.userid = req.user.profile.id;
+
+		
+		loadUserStore();
+		loadandsortStored();
 
 		res.redirect('/');
 	}
@@ -274,6 +273,33 @@ server.listen(config.port, () => {
 function pushtoQueue(destfilename, storeitem, authToken) {
 	console.log('sent to queue.');
 	waiting.push({ filename: destfilename, item: storeitem, authToken: authToken });
+}
+
+function processPairedList() {
+	var onserver = [];
+	var localonly = [];
+
+	var itemnames = pairs.gitems.map(function(v) {
+		return v.filename;
+	});
+
+	console.log('Comparing.');
+
+	for (var i in pairs.localfiles) {
+		var f = itemnames.indexOf(path.basename(pairs.localfiles[i].toString()));
+
+		if (f > -1) {
+			onserver.push(pairs.localfiles[i].toString());
+		} else {
+			localonly.push(pairs.localfiles[i].toString());
+		}
+	}
+
+	pairs.onserver = onserver;
+	pairs.localonly = localonly;
+
+	moveItems(pairs.onserver, config.curraccount.onserverdirectory);
+	moveItems(pairs.localonly, config.curraccount.localdirectory);
 }
 
 async function updateSize(authToken, storeitem, maxretries) {
@@ -357,9 +383,6 @@ async function startJob(destfilename, storeitem, authToken) {
 		console.log(' PIPE ERROR LOADING ! : ' + this.filename);
 		console.log(err);
 	});
-
-
-	
 
 	var pipe = request.get(url + '=d' + storeitem.voption);
 
@@ -524,13 +547,15 @@ var waiting = [];
 //var canbeskipped = [];
 
 var endtimer = false;
+
+// will limit the number of items from a server refresh to 100
 const fasttest = false;
 const localdir = '/Data/Desktop/Combined Photos etc/mp4locals';
 //'C:\\Users\\John\\Desktop\\Combined Photos etc\\mp4locals';
 const onserverdir = '/Data/Desktop/Combined Photos etc/mp4sonserver';
 //'C:\\Users\\John\\Desktop\\Combined Photos etc\\mp4sonserver';
 const othersourcedir = '';
-const pulldir = '/Data/Desktop/Combined Photos etc/mp4spulled';
+const pulldir = '/Data/Desktop/Combined Photos etc/techguyalpha';
 //'C:\\Users\\John\\Desktop\\Combined Photos etc\\mp4spulled';
 
 var pairs = {};
@@ -558,7 +583,8 @@ function loadandsortStored() {
 	stored = JSON.parse(fs.readFileSync('itemstore.json'));
 
 	stored.sort(function(a, b) {
-		if (a.finished && !b.finished) return 1;
+		if (a.userid == config.userid && b.userid != config.userid) return -1;
+		else if (a.finished && !b.finished) return 1;
 		else if (!a.finished && b.finished) return -1;
 		else if (a.id > b.id) return 1;
 		else if (a.id < b.id) return -1;
@@ -572,25 +598,36 @@ function writeStored() {
 	fs.writeFileSync('itemstore.json', JSON.stringify(stored));
 }
 
-async function getpairedlist(authToken, paths) {
+async function getpairedlist(online, authToken, paths) {
 	loadandsortStored();
 
 	var files = [];
 
 	console.log('recursing local store');
 
+	// retrieve a list of local files.
 	for (var i in paths) {
 		files = files.concat(recursepath(paths[i]));
 	}
 
 	console.log('requesting items en masse.');
 
-	var result = await listItems(authToken);
+	var result = [];
+
+	// get a list from online to see if there are anymore items, these get added to store automatically.
+	if (online) {
+		result = await listItems(authToken);
+	} else {
+		for (var i in stored) {
+			result.push(lodash.cloneDeep(stored[i]));
+		}
+	}
 
 	console.log('got info on ' + result.length + ' items.');
 
 	console.log('extracting basenames of files on disk.');
 	// these will only be used here
+	// retrieve a list filenames from the list of local files.
 	var namesonly = files.map(function(val) {
 		return path.basename(val.toString());
 	});
@@ -605,46 +642,66 @@ async function getpairedlist(authToken, paths) {
 		var stb = searchstore(b.id);
 
 		// sort items that are alredy on the harddrive to the top.
-		var conta = namesonly.indexOf(a.filename) > -1;
-		var contb = namesonly.indexOf(b.filename) > -1;
-
 		var contai = namesonly.indexOf(a.filename);
 		var contbi = namesonly.indexOf(b.filename);
 
-		if (conta && sta > -1) {
-			if (path.basename(files[contai].toString()) != namesonly[contai]) {
-				console.log('Files at index: ' + contai + " don't match !");
-				throw new exception('error with files. pausing.');
-			}
+		// get indexes of stored filenames
+		//var contai = namesonly.indexOf(a.filename);
+		//var contbi = namesonly.indexOf(b.filename);
 
+		//  hrmmm.
+		if (contai > -1) {
+			// this must have been happening at one point, but it never does now.
+			// why ?
+			// TODO: WHY THE HELL DID I PUT THIS HERE ????
+			// if (path.basename(files[contai].toString()) != namesonly[contai]) {
+			// 	console.log('Files at index: ' + contai + " don't match !");
+			// 	throw new exception('error with files. pausing.');
+			// }
+
+			// files in the directories are assumed to be originals of the files on the server.
+			// store there size, BECAUSE.
 			var stat = fs.statSync(files[contai]);
-			stored[sta].originalsize = stat.size;
 
-			writeStored();
+			if (!stored[sta].originalsize) {
+				stored[sta].originalsize = stat.size;
+
+				writeStored();
+			}
 		}
 
-		if (contb && stb > -1) {
-			if (path.basename(files[contbi].toString()) != namesonly[contbi]) {
-				console.log('Files at index: ' + contbi + " don't match !");
-				throw new exception('error with files. pausing.');
-			}
+		if (contbi > -1) {
+			// this must have been happening at one point, but it never does now.
+			// why ?
+			// TODO: WHY THE HELL DID I PUT THIS HERE ????
+			// if (path.basename(files[contbi].toString()) != namesonly[contbi]) {
+			// 	console.log('Files at index: ' + contbi + " don't match !");
+			// 	throw new exception('error with files. pausing.');
+			// }
+
+			// files in the directories are assumed to be originals of the files on the server.
+			// store there size, BECAUSE.
 
 			var stat = fs.statSync(files[contbi]);
-			stored[stb].originalsize = stat.size;
+
+			if (!stored[stb].originalsize || stored[stb].originalsize != stat) stored[stb].originalsize = stat.size;
 
 			writeStored();
 		}
 
-		a.islocal = conta;
-		b.islocal = contb;
+		// mark results items as local
+		a.islocal = contai > -1;
+		b.islocal = contbi > -1;
+
+		// now sort matches for download.
 
 		// if the first file is contained and the second is not, it gets sorted up
-		if (conta && !contb) {
+		if (a.islocal && !b.islocal) {
 			return -1;
-		} else if (!conta && contb) {
+		} else if (!a.islocal && b.islocal) {
 			// if the first file is not contained in local files and second file is, sort down
 			return 1;
-		} else if (conta == contb) {
+		} else if (a.islocal == b.islocal) {
 			// if both are either on the harddisk or not on the hardisk, sort by filename.
 			if (sta > -1 && stb > -1) {
 				// if the size field is set in the first sort it upwards...
@@ -715,12 +772,19 @@ async function listItems(authToken) {
 		for (var j in stored) {
 			if (matches[i].id == stored[j].id) {
 				found = true;
+				stored[j].userid = config.userid;
 				break;
 			}
 		}
 
 		if (!found) {
-			stored.push({ id: matches[i].id, filename: matches[i].filename, size: -1, finished: false });
+			stored.push({
+				id: matches[i].id,
+				filename: matches[i].filename,
+				size: -1,
+				finished: false,
+				account: config.userid
+			});
 		}
 	}
 
@@ -817,4 +881,64 @@ function refreshtimerrestart() {
 	}, config.atoken.expires_in * 1000);
 
 	console.log('Started refresh timer.');
+}
+
+var accounts = [];
+
+function findUser() {
+	var userfound = false;
+
+	if (config.userid) {
+		for (var i in accounts) {
+			if (accounts[i].userid == config.userid) {
+				config.curraccount = accounts[i];
+				userfound = true;
+				break;
+			}
+		}
+	}
+
+	return userfound;
+}
+
+function createUser() {
+
+	if (config.userid) {
+
+		var userfound = findUser();
+
+		if (!userfound) {
+			var acc = {
+				userid: config.userid,
+				title: 'Google User',
+				localdirectory: localdir,
+				onserverdirectory: onserverdir,
+				destdir: pulldir
+			};
+
+			accounts.push(acc);
+			config.curraccount = acc;
+
+			return acc;
+		}
+	}
+
+	return null;
+}
+
+function writeUserStore() {
+	createUser();
+	fs.writeFileSync('accountstores.json', JSON.stringify(accounts));
+}
+
+function loadUserStore() {
+	if (!fs.existsSync('accountstores.json')) {
+	
+		writeUserStore();
+
+	} else {
+
+		accounts = JSON.parse(fs.readFileSync('accountstores.json'));
+		writeUserStore();
+	}
 }
