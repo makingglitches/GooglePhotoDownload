@@ -16,7 +16,7 @@
 
 var fs = require('fs');
 
-var obj = JSON.parse( fs.readFileSync('client_id.json'));
+var obj = JSON.parse( fs.readFileSync('client_id copy.json'));
 
 
 const config = {};

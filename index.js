@@ -18,6 +18,8 @@ const req = require('request');
 const querystring = require('querystring');
 const lodash = require('lodash');
 
+const nodownload = false;
+
 var atoken = {};
 
 var d1 = 'itemstore-backup-' + Date.now() + '.json';
@@ -126,7 +128,10 @@ app.get('/', (req, res) => {
 app.post('/redownloadstart', async (req, res) => {
 	if (!pairs || !pairs.gitems) {
 		console.log('skipping online refresh getting stored items');
-		pairs = await getpairedlist(false, '', [ config.curraccount.localdirectory, config.curraccount.onserverdirectory ]);
+		pairs = await getpairedlist(false, '', [
+			config.curraccount.localdirectory,
+			config.curraccount.onserverdirectory
+		]);
 		processPairedList();
 	}
 
@@ -149,40 +154,49 @@ app.post('/redownloadstart', async (req, res) => {
 
 		// download headers have not been pulled back if expected size is -1
 		if (!storeitem.size || storeitem.size == -1) {
-			await updateSize(config.atoken.access_token, storeitem, 5);
-		}
-
-		var destfilename = config.curraccount.destdir  + '/' + item.filename;
-
-		// check if the download appears to be done.
-		if (fs.existsSync(destfilename)) {
-			var stat = fs.statSync(destfilename);
-
-			// the expected size exists.
-			// mark to be skipped.
-			if (stat.size == storeitem.size) {
-				storeitem.finished = true;
-				writeStored();
-
-				console.log('File ' + item.filename + ' already finished');
-			} else {
-				// remove the file and start again
-				storeitem.finished = false;
-				writeStored();
-
-				console.log('File ' + item.filename + ' marked for redownload');
-
-				if (stat.size == 0) {
-					console.log('Has size 0, deleteing');
-				} else {
-					console.log('Has unmatched sizes, deleting');
-				}
-
-				fs.rmSync(destfilename);
+			if (nodownload)
+			{
+				updateSize(config.atoken.access_token, storeitem, 5);
+			}
+			else
+			{
+				await updateSize(config.atoken.access_token, storeitem, 5);
 			}
 		}
 
-		if (!storeitem.finished) pushtoQueue(destfilename, storeitem, config.atoken.access_token);
+		if (!nodownload) {
+			var destfilename = config.curraccount.destdir + '/' + item.filename;
+
+			// check if the download appears to be done.
+			if (fs.existsSync(destfilename)) {
+				var stat = fs.statSync(destfilename);
+
+				// the expected size exists.
+				// mark to be skipped.
+				if (stat.size == storeitem.size) {
+					storeitem.finished = true;
+					writeStored();
+
+					console.log('File ' + item.filename + ' already finished');
+				} else {
+					// remove the file and start again
+					storeitem.finished = false;
+					writeStored();
+
+					console.log('File ' + item.filename + ' marked for redownload');
+
+					if (stat.size == 0) {
+						console.log('Has size 0, deleteing');
+					} else {
+						console.log('Has unmatched sizes, deleting');
+					}
+
+					fs.rmSync(destfilename);
+				}
+			}
+
+			if (!storeitem.finished) pushtoQueue(destfilename, storeitem, config.atoken.access_token);
+		}
 	}
 
 	endtimer = true;
@@ -193,7 +207,10 @@ app.get('/getlist', async (req, res) => {
 		// less than optimal is where it doesnt check length.
 		// unfortunately how can it without downloading every item if fucking google doesnt expose that field ?
 
-		pairs = await getpairedlist(true, config.atoken.access_token, [ config.curraccount.localdirectory, config.curraccount.onserverdirectory ]);
+		pairs = await getpairedlist(true, config.atoken.access_token, [
+			config.curraccount.localdirectory,
+			config.curraccount.onserverdirectory
+		]);
 
 		processPairedList();
 
@@ -247,12 +264,10 @@ app.get(
 		// User has logged in.
 		console.log('User has logged in.');
 
-
 		refreshtimerrestart();
 
 		config.userid = req.user.profile.id;
 
-		
 		loadUserStore();
 		loadandsortStored();
 
@@ -337,7 +352,14 @@ async function updateSize(authToken, storeitem, maxretries) {
 		}
 	}
 
-	console.log('Updated size.');
+	if ( retries >= maxretries)
+	{
+		console.log('Failed to Update Size.');
+	}
+	else
+	{
+		console.log('Updated size.');
+	}
 }
 
 function searchstore(id) {
@@ -356,6 +378,16 @@ async function refreshStoredUrl(authToken, storeitem) {
 	delete storeitem.baseUrl;
 	delete storeitem.lastdate;
 
+	if ( !result )
+	{
+		// apparently being super aggressive this way works.
+		// in short don't accept a failure just keep trying.
+		result = refreshStoredUrl(authToken,storeitem);
+		return result.baseUrl;
+	}
+	else
+	{
+
 	storeitem.voption = result.mediaMetadata.video ? 'v' : '';
 
 	writeStored();
@@ -363,6 +395,7 @@ async function refreshStoredUrl(authToken, storeitem) {
 	console.log('Updated URL');
 
 	return result.baseUrl;
+	}
 }
 
 async function startJob(destfilename, storeitem, authToken) {
@@ -525,6 +558,8 @@ async function getitem(authToken, id, maxretries = 5) {
 			console.log('GetItem failed, Retry ' + retries + ' of ' + maxretries);
 		}
 
+		try
+		{
 		var result = await request
 			.get(config.apiEndpoint + '/v1/mediaItems/' + id, {
 				headers: { 'Content-Type': 'application/json' },
@@ -533,9 +568,17 @@ async function getitem(authToken, id, maxretries = 5) {
 				auth: { bearer: authToken }
 			})
 			.on('error', function(err) {
+				console.log('reached error');
 				retry = true;
 				retries++;
 			});
+		}
+		catch(err)
+		{
+			console.log('reached error');
+			retry = true;
+			retries++;
+		}
 	}
 
 	return result;
@@ -632,98 +675,103 @@ async function getpairedlist(online, authToken, paths) {
 		return path.basename(val.toString());
 	});
 
-	console.log('search by undownloaded and original file on disk.');
-	// sort the gitems array in pairs.
-	// if originals are on server already, to save disk space download these first.
-	// so they can be compared and deleted.
-	result.sort(function(a, b) {
-		// sort items that are in the store right below the
-		var sta = searchstore(a.id);
-		var stb = searchstore(b.id);
+	if (!nodownload) {
+		console.log('search by undownloaded and original file on disk.');
+		// sort the gitems array in pairs.
+		// if originals are on server already, to save disk space download these first.
+		// so they can be compared and deleted.
+		result.sort(function(a, b) {
 
-		// sort items that are alredy on the harddrive to the top.
-		var contai = namesonly.indexOf(a.filename);
-		var contbi = namesonly.indexOf(b.filename);
+	
+			// i don't think this is ever the case anymore.
+			// sort items that are in the store right below the
+			var sta = searchstore(a.id);
+			var stb = searchstore(b.id);
 
-		// get indexes of stored filenames
-		//var contai = namesonly.indexOf(a.filename);
-		//var contbi = namesonly.indexOf(b.filename);
+			// sort items that are alredy on the harddrive to the top.
+			var contai = namesonly.indexOf(a.filename);
+			var contbi = namesonly.indexOf(b.filename);
 
-		//  hrmmm.
-		if (contai > -1) {
-			// this must have been happening at one point, but it never does now.
-			// why ?
-			// TODO: WHY THE HELL DID I PUT THIS HERE ????
-			// if (path.basename(files[contai].toString()) != namesonly[contai]) {
-			// 	console.log('Files at index: ' + contai + " don't match !");
-			// 	throw new exception('error with files. pausing.');
-			// }
+			// get indexes of stored filenames
+			//var contai = namesonly.indexOf(a.filename);
+			//var contbi = namesonly.indexOf(b.filename);
 
-			// files in the directories are assumed to be originals of the files on the server.
-			// store there size, BECAUSE.
-			var stat = fs.statSync(files[contai]);
+			//  hrmmm.
+			if (contai > -1) {
+				// this must have been happening at one point, but it never does now.
+				// why ?
+				// TODO: WHY THE HELL DID I PUT THIS HERE ????
+				// if (path.basename(files[contai].toString()) != namesonly[contai]) {
+				// 	console.log('Files at index: ' + contai + " don't match !");
+				// 	throw new exception('error with files. pausing.');
+				// }
 
-			if (!stored[sta].originalsize) {
-				stored[sta].originalsize = stat.size;
+				// files in the directories are assumed to be originals of the files on the server.
+				// store there size, BECAUSE.
+				var stat = fs.statSync(files[contai]);
+
+				if (!stored[sta].originalsize) {
+					stored[sta].originalsize = stat.size;
+
+					writeStored();
+				}
+			}
+
+			if (contbi > -1) {
+				// this must have been happening at one point, but it never does now.
+				// why ?
+				// TODO: WHY THE HELL DID I PUT THIS HERE ????
+				// if (path.basename(files[contbi].toString()) != namesonly[contbi]) {
+				// 	console.log('Files at index: ' + contbi + " don't match !");
+				// 	throw new exception('error with files. pausing.');
+				// }
+
+				// files in the directories are assumed to be originals of the files on the server.
+				// store there size, BECAUSE.
+
+				var stat = fs.statSync(files[contbi]);
+
+				if (!stored[stb].originalsize || stored[stb].originalsize != stat) stored[stb].originalsize = stat.size;
 
 				writeStored();
 			}
-		}
 
-		if (contbi > -1) {
-			// this must have been happening at one point, but it never does now.
-			// why ?
-			// TODO: WHY THE HELL DID I PUT THIS HERE ????
-			// if (path.basename(files[contbi].toString()) != namesonly[contbi]) {
-			// 	console.log('Files at index: ' + contbi + " don't match !");
-			// 	throw new exception('error with files. pausing.');
-			// }
+			// mark results items as local
+			a.islocal = contai > -1;
+			b.islocal = contbi > -1;
 
-			// files in the directories are assumed to be originals of the files on the server.
-			// store there size, BECAUSE.
+			// now sort matches for download.
 
-			var stat = fs.statSync(files[contbi]);
-
-			if (!stored[stb].originalsize || stored[stb].originalsize != stat) stored[stb].originalsize = stat.size;
-
-			writeStored();
-		}
-
-		// mark results items as local
-		a.islocal = contai > -1;
-		b.islocal = contbi > -1;
-
-		// now sort matches for download.
-
-		// if the first file is contained and the second is not, it gets sorted up
-		if (a.islocal && !b.islocal) {
-			return -1;
-		} else if (!a.islocal && b.islocal) {
-			// if the first file is not contained in local files and second file is, sort down
-			return 1;
-		} else if (a.islocal == b.islocal) {
-			// if both are either on the harddisk or not on the hardisk, sort by filename.
-			if (sta > -1 && stb > -1) {
-				// if the size field is set in the first sort it upwards...
-				if (stored[sta].size > -1 && stored[stb].size == -1) {
-					return -1;
-				} else if (stored[sta].size == -1 && stored[stb].size > -1) {
-					// if the size field is not set in the first sort it downwards..
-					return 1;
-				} else if (stored[sta].size < stored[stb].size) {
-					return -1;
-				} else if (stored[sta].size > stored[stb].size) {
-					return 1;
-				}
-			} else if (a.filename < b.filename) {
+			// if the first file is contained and the second is not, it gets sorted up
+			if (a.islocal && !b.islocal) {
 				return -1;
-			} else if (a.filename > b.filename) {
+			} else if (!a.islocal && b.islocal) {
+				// if the first file is not contained in local files and second file is, sort down
 				return 1;
-			} else {
-				return 0;
+			} else if (a.islocal == b.islocal) {
+				// if both are either on the harddisk or not on the hardisk, sort by filename.
+				if (sta > -1 && stb > -1) {
+					// if the size field is set in the first sort it upwards...
+					if (stored[sta].size > -1 && stored[stb].size == -1) {
+						return -1;
+					} else if (stored[sta].size == -1 && stored[stb].size > -1) {
+						// if the size field is not set in the first sort it downwards..
+						return 1;
+					} else if (stored[sta].size < stored[stb].size) {
+						return -1;
+					} else if (stored[sta].size > stored[stb].size) {
+						return 1;
+					}
+				} else if (a.filename < b.filename) {
+					return -1;
+				} else if (a.filename > b.filename) {
+					return 1;
+				} else {
+					return 0;
+				}
 			}
-		}
-	});
+		});
+	}
 
 	return { gitems: result, localfiles: files };
 }
@@ -783,7 +831,7 @@ async function listItems(authToken) {
 				filename: matches[i].filename,
 				size: -1,
 				finished: false,
-				account: config.userid
+				userid: config.userid
 			});
 		}
 	}
@@ -902,9 +950,7 @@ function findUser() {
 }
 
 function createUser() {
-
 	if (config.userid) {
-
 		var userfound = findUser();
 
 		if (!userfound) {
@@ -933,11 +979,8 @@ function writeUserStore() {
 
 function loadUserStore() {
 	if (!fs.existsSync('accountstores.json')) {
-	
 		writeUserStore();
-
 	} else {
-
 		accounts = JSON.parse(fs.readFileSync('accountstores.json'));
 		writeUserStore();
 	}
