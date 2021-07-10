@@ -1,0 +1,14 @@
+{
+  "name": "cjs",
+  "version": "0.0.11",
+  "description": "Concurrent Javascript",
+  "main": "cjs.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Johannes Goetz",
+  "license": "BSD",
+  "dependencies": {
+    "sync-channel": "*"
+  }
+}

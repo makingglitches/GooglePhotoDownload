@@ -106,6 +106,31 @@ var items=[];
                 );
 
     });
+
+
+    $('#upload').click(function()
+        {
+            $.ajax(
+                {
+                    type: 'GET',
+                    url: '/upload',
+                    dataType: 'json',
+                    data: {},
+                    success: (data) =>
+                    {
+                        console.log('kicked off upload job.')
+                    },
+                    error: (jq,tx,err) =>
+                    {
+                        console.log("upload threw an error ");
+                        console.log(tx);
+                        console.log(err);
+                    }        
+                }
+                );
+            
+        });
+
         
     }
     );
@@ -123,6 +148,7 @@ var items=[];
     <a id="getitems" href="javascript:void(0)">Click to retrieve photo list</a><br>
     <a id="grabitems" href="javascript:void(0)">Click to re-download items</a><br>
     <a id="forcerefresh" href="javascript:void(0)">Force refresh of access token</a>
+    <a id="upload" href="javascript:void(0)">Test Upload</a>
 </body>
 
 </html>

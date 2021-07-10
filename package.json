@@ -16,6 +16,7 @@
     "express-session": "^1.17.1",
     "install": "^0.13.0",
     "lodash": "^4.17.21",
+    "mime-types": "^2.1.31",
     "node-persist": "^3.1.0",
     "passport": "^0.4.1",
     "passport-google-oauth20": "^2.0.0",

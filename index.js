@@ -17,18 +17,17 @@ const uuid = require('uuid');
 const req = require('request');
 const querystring = require('querystring');
 const lodash = require('lodash');
+const mime = require('mime-types');
 
 const nodownload = false;
 
 var atoken = {};
 
-var d1 = 'itemstore-backup-' + Date.now() + '.json';
+loadandsortStored();
+loadUserStore();
+backupFile('itemstore.json');
+backupFile('accountstores.json');
 
-fs.copyFileSync('itemstore.json', d1);
-
-var d1 = 'accountstores-backup-' + Date.now() + '.json';
-
-fs.copyFileSync('accountstores.json', d1);
 
 // on occasion the sessions directory will interfere with oauth 2, and for some reason
 // this will cause the wrong authentication token to be passed into the express stack.
@@ -72,6 +71,7 @@ const { waitForDebugger } = require('inspector');
 const { json } = require('express');
 const { WSAENOTSOCK } = require('constants');
 const { exception } = require('console');
+const { CONNREFUSED } = require('dns');
 
 auth(passport);
 
@@ -128,7 +128,7 @@ app.get('/', (req, res) => {
 app.post('/redownloadstart', async (req, res) => {
 	if (!pairs || !pairs.gitems) {
 		console.log('skipping online refresh getting stored items');
-		pairs = await getpairedlist(false, '', [
+		pairs = await getpairedlist(false,  [
 			config.curraccount.localdirectory,
 			config.curraccount.onserverdirectory
 		]);
@@ -148,19 +148,33 @@ app.post('/redownloadstart', async (req, res) => {
 
 		var item = pairs.gitems[i];
 
-		// retrieve item from itemstore
-		var storeindex = searchstore(item.id);
-		var storeitem = stored[storeindex];
+		var storeitem = null;
+
+		if (item.storeindex)
+		{
+			storeitem = stored[item.storeindex];
+		}
+		else
+		{
+			var storeindex = searchstore(item.id);
+			storeitem = stored[storeindex];
+		}
+
+		if (storeitem.userid != config.userid)
+		{
+			console.log('Item is from different user account');
+			continue;
+		}
 
 		// download headers have not been pulled back if expected size is -1
 		if (!storeitem.size || storeitem.size == -1) {
 			if (nodownload)
 			{
-				updateSize(config.atoken.access_token, storeitem, 5);
+				updateSize(storeitem, 5);
 			}
 			else
 			{
-				await updateSize(config.atoken.access_token, storeitem, 5);
+				await updateSize(storeitem, 5);
 			}
 		}
 
@@ -171,17 +185,40 @@ app.post('/redownloadstart', async (req, res) => {
 			if (fs.existsSync(destfilename)) {
 				var stat = fs.statSync(destfilename);
 
-				// the expected size exists.
+				var downloadedCorrectly =  (storeitem.finished && storeitem.finishedsize &&  
+							  stat.size == storeitem.finishedsize) ||
+							  (stat.size == storeitem.size);
+			
+							  // the expected size exists.
 				// mark to be skipped.
-				if (stat.size == storeitem.size) {
+				if (downloadedCorrectly ) {
 					storeitem.finished = true;
+					storeitem.finishedsize = stat.size;
 					writeStored();
 
 					console.log('File ' + item.filename + ' already finished');
 				} else {
-					// remove the file and start again
-					storeitem.finished = false;
-					writeStored();
+
+					if (storeitem.finished)
+					{
+						// because of some issues that have been occurring with server sizes not being
+						// consistent, update to see if this fixes the problem.
+						await updateSize(storeitem);
+
+						if (storeitem.size == stat.size)
+						{
+							console.log("For file: "+storeitem.filename);
+							console.log("Size Update Fixed Issue. Skipping.");
+							continue;
+						}
+						else
+						{
+							// remove the file and start again
+							storeitem.finished = false;
+							writeStored();
+						}
+
+					}
 
 					console.log('File ' + item.filename + ' marked for redownload');
 
@@ -207,7 +244,7 @@ app.get('/getlist', async (req, res) => {
 		// less than optimal is where it doesnt check length.
 		// unfortunately how can it without downloading every item if fucking google doesnt expose that field ?
 
-		pairs = await getpairedlist(true, config.atoken.access_token, [
+		pairs = await getpairedlist(true,  [
 			config.curraccount.localdirectory,
 			config.curraccount.onserverdirectory
 		]);
@@ -217,6 +254,10 @@ app.get('/getlist', async (req, res) => {
 		res.status(200).send({ message: 'completed', server: pairs.onserver.length, local: pairs.localonly.length });
 
 		console.log('sent item info to client');
+	}
+	else
+	{
+		res.status(400).send('user not authenticated')
 	}
 });
 
@@ -229,6 +270,11 @@ app.get('/logout', (req, res) => {
 function acallback(arg1, arg2, arg3, arg4) {
 	console.log('reached auth callback');
 }
+
+app.get('/upload',async(req,res)=>{
+	testUpload();
+
+});
 
 // Start the OAuth login process for Google.
 app.get(
@@ -285,18 +331,25 @@ server.listen(config.port, () => {
 	console.log('Press Ctrl+C to quit.');
 });
 
-function pushtoQueue(destfilename, storeitem, authToken) {
+function pushtoQueue(destfilename, storeitem) {
 	console.log('sent to queue.');
-	waiting.push({ filename: destfilename, item: storeitem, authToken: authToken });
+	waiting.push({ filename: destfilename, item: storeitem });
 }
 
 function processPairedList() {
 	var onserver = [];
 	var localonly = [];
 
+	loadandsortStored();
+
+	/*
 	var itemnames = pairs.gitems.map(function(v) {
 		return v.filename;
 	});
+	*/
+
+	// supporting multiple users now, reduce extra uploading etc.
+	var itemnames = stored.map(function(v) { return v.filename;});
 
 	console.log('Comparing.');
 
@@ -317,8 +370,8 @@ function processPairedList() {
 	moveItems(pairs.localonly, config.curraccount.localdirectory);
 }
 
-async function updateSize(authToken, storeitem, maxretries) {
-	var url = await refreshStoredUrl(authToken, storeitem);
+async function updateSize(storeitem, maxretries) {
+	var url = await refreshStoredUrl(storeitem);
 
 	var retry = true;
 	var retries = 0;
@@ -372,8 +425,8 @@ function searchstore(id) {
 	return -1;
 }
 
-async function refreshStoredUrl(authToken, storeitem) {
-	var result = await getitem(authToken, storeitem.id);
+async function refreshStoredUrl(storeitem) {
+	var result = await getitem(storeitem.id);
 
 	delete storeitem.baseUrl;
 	delete storeitem.lastdate;
@@ -382,7 +435,7 @@ async function refreshStoredUrl(authToken, storeitem) {
 	{
 		// apparently being super aggressive this way works.
 		// in short don't accept a failure just keep trying.
-		result = refreshStoredUrl(authToken,storeitem);
+		result = refreshStoredUrl(storeitem);
 		return result.baseUrl;
 	}
 	else
@@ -398,15 +451,21 @@ async function refreshStoredUrl(authToken, storeitem) {
 	}
 }
 
-async function startJob(destfilename, storeitem, authToken) {
-	var url = await refreshStoredUrl(authToken, storeitem);
+async function startJob(destfilename, storeitem) {
+	var url = await refreshStoredUrl(storeitem);
 
 	var ostream = fs.createWriteStream(destfilename);
 
 	ostream.on('finish', function() {
 		console.log(' PIPE FINISHED !: ' + this.filename);
 
+		var size = fs.statSync(this.destination);
+		
+
 		this.storeitem.finished = true;
+		this.storeitem.finishedsize = size.size;
+		console.log("finished size: "+this.storeitem.finishedsize);
+		console.log("===>Id:"+storeitem.id);
 		writeStored();
 
 		pipes.splice(pipes.indexOf(this), 1);
@@ -433,7 +492,7 @@ async function startJob(destfilename, storeitem, authToken) {
 			}
 		}
 
-		pipes[i].close();
+		if (pipes[i].close) pipes[i].close();
 
 		if (fs.existsSync(pipes[i].destination)) {
 			console.log('deleting partial file.');
@@ -444,7 +503,7 @@ async function startJob(destfilename, storeitem, authToken) {
 
 		pipes.splice(i, 1);
 
-		pushtoQueue(p.destination, p.storeitem, p.authToken);
+		pushtoQueue(p.destination, p.storeitem);
 	});
 
 	pipe.catch(function(err) {
@@ -457,7 +516,6 @@ async function startJob(destfilename, storeitem, authToken) {
 	pipe.filename = storeitem.filename;
 	pipe.expectedSize = storeitem.size;
 	pipe.destination = destfilename;
-	pipe.authToken = authToken;
 
 	pipes.push(pipe);
 
@@ -474,7 +532,7 @@ async function timecall() {
 		if (started == googlegayasslimit) break;
 
 		var i = waiting.shift();
-		await startJob(i.filename, i.item, i.authToken);
+		await startJob(i.filename, i.item);
 	}
 
 	var message = '';
@@ -547,7 +605,7 @@ function recursepath(path) {
 	return files;
 }
 
-async function getitem(authToken, id, maxretries = 5) {
+async function getitem(id, maxretries = 5) {
 	var retry = true;
 	var retries = 0;
 
@@ -565,7 +623,7 @@ async function getitem(authToken, id, maxretries = 5) {
 				headers: { 'Content-Type': 'application/json' },
 				qs: {},
 				json: true,
-				auth: { bearer: authToken }
+				auth: { bearer: config.atoken.access_token }
 			})
 			.on('error', function(err) {
 				console.log('reached error');
@@ -584,7 +642,7 @@ async function getitem(authToken, id, maxretries = 5) {
 	return result;
 }
 
-var maxpipes = 5;
+var maxpipes = 11;
 var pipes = [];
 var waiting = [];
 //var canbeskipped = [];
@@ -641,7 +699,7 @@ function writeStored() {
 	fs.writeFileSync('itemstore.json', JSON.stringify(stored));
 }
 
-async function getpairedlist(online, authToken, paths) {
+async function getpairedlist(online, paths) {
 	loadandsortStored();
 
 	var files = [];
@@ -659,7 +717,7 @@ async function getpairedlist(online, authToken, paths) {
 
 	// get a list from online to see if there are anymore items, these get added to store automatically.
 	if (online) {
-		result = await listItems(authToken);
+		result = await listItems();
 	} else {
 		for (var i in stored) {
 			result.push(lodash.cloneDeep(stored[i]));
@@ -675,6 +733,13 @@ async function getpairedlist(online, authToken, paths) {
 		return path.basename(val.toString());
 	});
 
+
+	for (var f in namesonly)
+	{
+		var fname = namesonly[f];
+		// search the store for filename here.
+	}
+
 	if (!nodownload) {
 		console.log('search by undownloaded and original file on disk.');
 		// sort the gitems array in pairs.
@@ -682,67 +747,108 @@ async function getpairedlist(online, authToken, paths) {
 		// so they can be compared and deleted.
 		result.sort(function(a, b) {
 
-	
-			// i don't think this is ever the case anymore.
-			// sort items that are in the store right below the
-			var sta = searchstore(a.id);
-			var stb = searchstore(b.id);
+			var sta = null;
 
+			// marking should reduce search time with each sort.
+			if (!a.storeindex)
+			{
+				sta = searchstore(a.id);
+				a.storeindex = sta;
+			
+			}
+			else
+			{
+				sta = a.storeindex;
+			}
+			
+			var stb = null;
+			
+			if ( !b.storeindex)
+			{
+				stb = stb = searchstore(b.id);
+				b.storeindex = stb;
+ 
+			}
+			else
+			{
+				stb =b.storeindex;
+			}
+
+			
 			// sort items that are alredy on the harddrive to the top.
-			var contai = namesonly.indexOf(a.filename);
-			var contbi = namesonly.indexOf(b.filename);
 
-			// get indexes of stored filenames
-			//var contai = namesonly.indexOf(a.filename);
-			//var contbi = namesonly.indexOf(b.filename);
+			var contai = null;
+			var contbi = null;
 
-			//  hrmmm.
+			if (!a.fileindex)
+			{
+				contai = namesonly.indexOf(a.filename);
+				a.fileindex = contai;
+			}
+			else
+			{
+				contai = a.fileindex;
+			}
+
+			if (!b.fileindex)
+			{
+				contbi = namesonly.indexOf(b.filename);
+				b.fileindex = contbi;
+			}
+			else
+			{
+				contbi = b.fileindex;
+			}
+
+
+			var sizechange = false;
+			// this is costly, if the files original size is not tracked but the file exists
+			// store this size for space savings comparison later.
 			if (contai > -1) {
-				// this must have been happening at one point, but it never does now.
-				// why ?
-				// TODO: WHY THE HELL DID I PUT THIS HERE ????
-				// if (path.basename(files[contai].toString()) != namesonly[contai]) {
-				// 	console.log('Files at index: ' + contai + " don't match !");
-				// 	throw new exception('error with files. pausing.');
-				// }
-
-				// files in the directories are assumed to be originals of the files on the server.
-				// store there size, BECAUSE.
+			
 				var stat = fs.statSync(files[contai]);
-
+				
+		
 				if (!stored[sta].originalsize) {
+					sizechange = sizechange || true;
 					stored[sta].originalsize = stat.size;
-
-					writeStored();
 				}
 			}
 
 			if (contbi > -1) {
-				// this must have been happening at one point, but it never does now.
-				// why ?
-				// TODO: WHY THE HELL DID I PUT THIS HERE ????
-				// if (path.basename(files[contbi].toString()) != namesonly[contbi]) {
-				// 	console.log('Files at index: ' + contbi + " don't match !");
-				// 	throw new exception('error with files. pausing.');
-				// }
-
-				// files in the directories are assumed to be originals of the files on the server.
-				// store there size, BECAUSE.
 
 				var stat = fs.statSync(files[contbi]);
 
-				if (!stored[stb].originalsize || stored[stb].originalsize != stat) stored[stb].originalsize = stat.size;
+				if (!stored[stb].originalsize || stored[stb].originalsize != stat) 
+				{
+					sizechange = sizechange || true;
+					stored[stb].originalsize = stat.size;
+				}
 
-				writeStored();
 			}
 
 			// mark results items as local
 			a.islocal = contai > -1;
 			b.islocal = contbi > -1;
 
+			var isusera = stored[sta].userid == config.userid;
+			var isuserb = stored[stb].userid == config.userid;
+
 			// now sort matches for download.
 
 			// if the first file is contained and the second is not, it gets sorted up
+			if ( isusera != isuserb)
+			{
+				if (isusera) return -1;
+				if (isuserb) return 1;
+			}
+
+			if (stored[sta].finished != stored[stb].finishedsize)
+			{
+				if (stored[sta].finished) return 1;
+				return -1;
+			}
+
 			if (a.islocal && !b.islocal) {
 				return -1;
 			} else if (!a.islocal && b.islocal) {
@@ -773,6 +879,9 @@ async function getpairedlist(online, authToken, paths) {
 		});
 	}
 
+	writeStored();
+			
+
 	return { gitems: result, localfiles: files };
 }
 
@@ -783,12 +892,12 @@ function checkauth(req) {
 	return config.atoken.access_token;
 }
 
-async function listItems(authToken) {
+async function listItems() {
 	var result = await request.get(config.apiEndpoint + '/v1/mediaItems', {
 		headers: { 'Content-Type': 'application/json' },
 		qs: { pageSize: 100 },
 		json: true,
-		auth: { bearer: authToken }
+		auth: { bearer: config.atoken.access_token }
 	});
 
 	var matches = [];
@@ -802,7 +911,7 @@ async function listItems(authToken) {
 				headers: { 'Content-Type': 'application/json' },
 				qs: { pageSize: 100, pageToken: result.nextPageToken },
 				json: true,
-				auth: { bearer: authToken }
+				auth: { bearer: config.atoken.access_token }
 			})
 			.catch(function(error) {
 				console.log(error);
@@ -846,7 +955,7 @@ async function listItems(authToken) {
 
 // Returns a list of all albums owner by the logged in user from the Library
 // API.
-async function libraryApiGetAlbums(authToken) {
+async function libraryApiGetAlbums() {
 	let albums = [];
 	let nextPageToken = null;
 	let error = null;
@@ -864,7 +973,7 @@ async function libraryApiGetAlbums(authToken) {
 				headers: { 'Content-Type': 'application/json' },
 				qs: parameters,
 				json: true,
-				auth: { bearer: authToken }
+				auth: { bearer: config.atoken.access_token }
 			});
 
 			console.log(`Response: ${result}`);
@@ -905,7 +1014,7 @@ async function refreshAccessToken() {
 		//	headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
 		form: querystring.stringify(parameters)
 		//	json: true,
-		//	auth: { bearer: authToken }
+
 	});
 
 	// this needs to be where we store the f-ing auth token, fuck passport past the initial crap
@@ -984,4 +1093,45 @@ function loadUserStore() {
 		accounts = JSON.parse(fs.readFileSync('accountstores.json'));
 		writeUserStore();
 	}
+}
+
+
+function testUpload(filename)
+{
+
+	var req = https.request('https://www.google.com',{method:"get"});
+	
+	var mt = mime.lookup(filename);
+	var options =
+	{
+		headers: { 
+					'Content-Type': 'application/octet-stream',
+					'X-Goog-Upload-Content-Type': mt,
+					'X-Goog-Upload-Protocol' : 'raw'
+				 },
+
+		auth: { 
+			bearer: config.atoken.access_token
+			}
+
+	};
+
+	request.post('https://photoslibrary.googleapis.com/v1/uploads',options)
+}
+
+
+function backupFile(filename)
+{
+	var dir = path.dirname(filename);
+	var fn = path.basename(filename);
+	var ext = path.extname(filename);
+	var ds = Date.now();
+
+	var d1 = dir+ path.sep+fn+'-backup-'+ds+ext;
+
+	fs.copyFileSync('itemstore.json', d1);
+
+
+
+	console.log("Backed up: "+filename+" to backup file: " +d1)
 }

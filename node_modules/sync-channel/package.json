@@ -1,0 +1,16 @@
+{
+  "name": "sync-channel",
+  "version": "0.0.6",
+  "description": "synchronous communication channel",
+  "main": "sync-channel.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "concurrent",
+    "channel",
+    "async"
+  ],
+  "author": "snetz",
+  "license": "BSD"
+}

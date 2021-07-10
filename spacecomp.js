@@ -1,5 +1,63 @@
 
+const { json } = require('express');
 const fs = require('fs')
+const path = require('path')
+
+var files = fs.readdirSync('.', {withFileTypes:true});
+
+// this compensates for fuckups.
+var orisizes =[];
+
+
+// go through all the backups and search for values that contain originalsize for files that may have been deleted 
+// as the desired results were found but development corrupted the write store.
+for (var f in files)
+{
+    if (!files[f].isDirectory())
+    {
+        if (path.extname(files[f].name)=='.json' && path.basename(files[f].name)!='itemstore')
+        {
+            try
+            {
+                var tempitems = JSON.parse(fs.readFileSync(files[f].name));
+            
+                for (var i in tempitems)
+                {
+                    if (tempitems[i].id && tempitems[i].originalsize)
+                    {
+                        var found = false;
+
+                        for (var o in orisizes)
+                        {
+                            if (orisizes[o].id == tempitems[i].id)
+                            {
+                                found= true;
+
+                                if (orisizes[o].id == tempitems[i].id && 
+                                     tempitems[i].originalsize > orisizes[o].originalsize)
+                                {
+                                    orisizes[o].id == tempitems[i].originalsize;
+                                }
+                                break;
+                            }
+                            
+                        }
+                        if (found ) continue;
+
+                        orisizes.push({id:tempitems.id, ori:tempitems.originalsize});
+                    }
+                 }
+            }
+            catch
+            {
+                continue;
+            }
+
+        }
+    }
+}
+
+console.log('orisize array size: '+orisizes.length);
 
 var items = JSON.parse(fs.readFileSync("itemstore.json"))
 
@@ -32,34 +90,61 @@ function toPerc(val)
 
 for (var i in items)
 {
-    if (items[i].size)
+    var item = items[i];
+
+    for (var o in origsize)
     {
-        totalDL+=items[i].size*1;
-        
-        if (items[i].finished)
+        if (item.id == orisizes[o].id)
         {
-            alreadydl+=items[i].size*1;
-            countdl++;
+            console.log('found original size.');
+            item.originalsize = orisizes[o].originalsize;
+            break;
         }
     }
 
-    
+    var finsize = 0;
 
-    if (items[i].originalsize && items[i].size)
+    if (item.size)
     {
-        newsize += items[i].size*1;
-      
-        origsize += items[i].originalsize*1;
-     
-        countorig++;
-    }
-    else if (!items[i].size)
+        // sometimes google doesn't update its item sizes correctly immediately
+        // this resulst in finished sizes greater than the server reported size
+        // obviously the finished size of the working value is the correct one to use
+        finsize =  item.finsihed && item.finishedsize ? item.finishedsize*1 : item.size*1;
+        finsize = finsize > item.size*1? finsize:item.size*1;
+
+        
+        totalDL+=finsize;
+        
+        if (item.finished)
+        {
+            alreadydl+=finsize;
+            countdl++;
+        }
+
+        // only track these together, depends on their being a ratio to compare
+        if (item.originalsize)
+        {
+            newsize += finsize;
+          
+            origsize += item.originalsize*1;
+        }
+    } 
+    else
     {
         nosize++;
     }
-    
-    
+
+    // seperate statistic involving the original file being present.
+    if (items[i].originalsize)
+    {
+        countorig++; 
+    }
+
 }
+
+console.log('writing updated itemtore.');
+fs.writeFileSync('updated-itemstore.json',JSON.stringify(items));
+
 
 totalDL = totalDL / 1024/1024/1024;
 alreadydl= alreadydl /  1024/1024/1024;
