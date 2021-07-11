@@ -11,17 +11,17 @@ function createLevel(level, parent) {
 	level.parent = parent;
 }
 
-function addToTree(tree, key, index = 0, value,keypath) {
+function addToTree(tree, key, index = 0, keypath,tag) {
 	if (!tree.categories) {
 		createLevel(tree);
 	}
 
-	if (index == filename.length) {
+	if (index == key.length) {
 		// likely these will always be small.
         var found = false;
         var obj = null
 
-        for (var i in tree.files)
+        for (var i in tree.keys)
         {
             obj = tree.keys[i];
 
@@ -32,21 +32,21 @@ function addToTree(tree, key, index = 0, value,keypath) {
             }
         }
 
-		// either the same filename exists in a different directory
-		// or the filename does not exist at all.
+		// either the same key exists in a different directory
+		// or the key does not exist at all.
 		if (!found) {
 			
-            obj = { filename: filename, dirname: dname };
+            obj = { key: key, tag: tag };
 
-			tree.files.push(obj);
+			tree.keys.push(obj);
 			tree.count++;
 			return { tree: tree, obj: obj, dup: false, exists: true, keypath:keypath };
 		} else {
-			console.log('duplicate filename ' + filename);
+			console.log('duplicate key ' + key);
 			return { tree: tree, obj: obj, dup: true, exists: true, keypath:keypath };
 		}
 	} else {
-		var c = filename[index];
+		var c = key[index];
 
 		if (!tree.categories[c]) {
 			tree.categories[c] = [];
@@ -58,21 +58,21 @@ function addToTree(tree, key, index = 0, value,keypath) {
 
 		index++;
 		// big fan of sensible recursion in js.
-		return addFileToTree(tree.categories[c], filename, index, dname,keypath);
+		return addToTree(tree.categories[c], key, index, keypath, tag);
 	}
 }
 
-function findbyname(tree, filename, index, keypath, dname = null) {
-	if (index == filename.length) {
+function findInTree(tree, key, keypath, index=0) {
+	if (index == key.length) {
 		var found = false;
 		var obj = null;
 
-		for (i in tree.files) {
-            obj = tree.files[i];
-			if (tree.files[i].filename == filename && tree.files[i].dirname == dname) {
+		for (i in tree.keys) {
+            obj = tree.keys[i];
+			if (tree.keys[i].key == key ) {
 				found = true;
-				obj = tree.files[i];
-				break;
+				obj = tree.keys[i];
+				break;s
 			}
 		}
 
@@ -82,12 +82,12 @@ function findbyname(tree, filename, index, keypath, dname = null) {
 			return { found: true, tree: tree, keypath: keypath, obj: obj };
 		}
 	} else {
-		var c = filename[index];
+		var c = key[index];
 
-		if (tree.categories[c]) {
+		if (tree.categories &&  tree.categories[c]) {
 			keypath.push(c);
 			index++;
-			return findbyname(tree.categories[c], filename, index, keypath, dname);
+			return findInTree(tree.categories[c], key, keypath, index);
 		} else {
 			return { found: false, tree: tree, keypath: keypath, obj: null };
 		}
@@ -97,12 +97,12 @@ function findbyname(tree, filename, index, keypath, dname = null) {
 
 
 
-var bintree = 
+var keytree = 
 {
-    addByExtension:addByExtension,
-    findByExtension:findByExtension
+	addToTree:addToTree,
+    findInTree:findInTree
 }
 
 
 
-module.exports = bintree;
+module.exports = keytree;

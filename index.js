@@ -23,6 +23,23 @@ const nodownload = false;
 
 var atoken = {};
 
+
+var processedstats = {
+	userid:'',
+	missinglocal:0,
+	missingonline:0,
+	sizemismatch:0,
+	finnotequaltosize:0,
+	finnotequaltostat:0,
+	finished:0,
+	total:0,
+	sizeretry:0,
+	size:0,
+	itemretry:0,
+	item:0
+
+}
+
 loadandsortStored();
 loadUserStore();
 backupFile('itemstore.json');
@@ -126,6 +143,11 @@ app.get('/', (req, res) => {
 });
 
 app.post('/redownloadstart', async (req, res) => {
+
+	processedstats.userid = config.userid;
+
+	var online = true;
+
 	if (!pairs || !pairs.gitems) {
 		console.log('skipping online refresh getting stored items');
 		pairs = await getpairedlist(false,  [
@@ -133,6 +155,8 @@ app.post('/redownloadstart', async (req, res) => {
 			config.curraccount.onserverdirectory
 		]);
 		processPairedList();
+
+		online =false;
 	}
 
 	if (pairs) {
@@ -144,6 +168,9 @@ app.post('/redownloadstart', async (req, res) => {
 	}
 
 	for (var i in pairs.gitems) {
+
+		processedstats.total++;
+
 		console.log('At index ' + i + ' of ' + pairs.gitems.length);
 
 		var item = pairs.gitems[i];
@@ -160,10 +187,68 @@ app.post('/redownloadstart', async (req, res) => {
 			storeitem = stored[storeindex];
 		}
 
+		// indicate item is most definately online.
+		// because this flag means that this data was loaded from the server prior to run.
+		if (online)
+		{
+			// only update this if the list was pulled online.
+			storeitem.online = online;
+		}
+
+
+		if (storeitem.missingonline && storeitem.finished)
+		{
+			processedstats.missingonline++;
+			console.log("Marked missing online.")
+			continue;
+		}
+
+		// if the userinstance field hasnt been defined, define it.
+		if (!storeitem.userinstance)
+		{
+			storeitem.userinstance = [];
+			writeStored();
+		}
+
+		// if the online flag is sent that means the download list has been 
+		// sampled from the current online account.
+		if (online && storeitem.userinstance.indexOf(config.userid)==-1)
+		{
+			// add the current user to the list.
+			storeitem.userinstance.push(config.userid);
+		}
+
+
+		// this is a carry over.
 		if (storeitem.userid != config.userid)
 		{
-			console.log('Item is from different user account');
-			continue;
+			// if we have drawn the list from online
+			// set the existing userid which is from the itemstore
+			// into the userinstance field for future code updates.
+			if (online)
+			{
+				if (online && storeitem.userinstance.indexOf(storeitem.userid)==-1)
+				{
+					storeitem.userinstance.push(storeitem.userid);
+					storeitem.userid = config.userid;
+					writeStored();
+				}
+			}
+			else
+			{
+				// this is the new way.
+				// if the item has been updated as it should have 
+				// because there is a possibility it could be shared across multiple accounts
+				// this indicates google is hashing images if they are deemed duplicates
+				// creating ids that exist between different accounts
+				// that indicates the possibility of media duplicate detection
+				// should later generate a list of items to delete.
+				if (config.userinstance.indexOf(storeitem.userid)==-1)
+				{
+					console.log('Item is from different user account');
+					continue;
+				}
+			}
 		}
 
 		// download headers have not been pulled back if expected size is -1
@@ -183,7 +268,18 @@ app.post('/redownloadstart', async (req, res) => {
 
 			// check if the download appears to be done.
 			if (fs.existsSync(destfilename)) {
+
+				storeitem.missinglocal = true;
+				writeStored();
 				var stat = fs.statSync(destfilename);
+
+				processedstats.sizemismatch+= stat.size != storeitem.size;
+
+				if (storeitem.finishedsize)
+				{
+					processedstats.finnotequaltosize += storeitem.size != storeitem.finishedsize;
+					processedstats.finnotequaltostat += storeitem.finishedsize != stat.size;
+				}
 
 				var downloadedCorrectly =  (storeitem.finished && storeitem.finishedsize &&  
 							  stat.size == storeitem.finishedsize) ||
@@ -194,6 +290,7 @@ app.post('/redownloadstart', async (req, res) => {
 				if (downloadedCorrectly ) {
 					storeitem.finished = true;
 					storeitem.finishedsize = stat.size;
+					processedstats.finished++;
 					writeStored();
 
 					console.log('File ' + item.filename + ' already finished');
@@ -230,6 +327,13 @@ app.post('/redownloadstart', async (req, res) => {
 
 					fs.rmSync(destfilename);
 				}
+			}
+			else
+			{
+				storeitem.finished = false;
+				storeitem.missinglocal = true;
+				processedstats.missinglocal++;
+				writeStored();
 			}
 
 			if (!storeitem.finished) pushtoQueue(destfilename, storeitem, config.atoken.access_token);
@@ -371,6 +475,9 @@ function processPairedList() {
 }
 
 async function updateSize(storeitem, maxretries) {
+
+	processedstats.size++;
+
 	var url = await refreshStoredUrl(storeitem);
 
 	var retry = true;
@@ -402,6 +509,7 @@ async function updateSize(storeitem, maxretries) {
 
 			retry = true;
 			retries++;
+			processedstats.sizeretry++;
 		}
 	}
 
@@ -426,7 +534,22 @@ function searchstore(id) {
 }
 
 async function refreshStoredUrl(storeitem) {
+
 	var result = await getitem(storeitem.id);
+
+	if (!result)
+	{
+		// didn't find this online.
+		storeitem.online = false;
+		// item is missing from online.
+		storeitem.missingonline = true;
+
+		storeitem.finished = true;
+
+		processedstats.missingonline++;
+
+		return null;
+	}
 
 	delete storeitem.baseUrl;
 	delete storeitem.lastdate;
@@ -454,6 +577,16 @@ async function refreshStoredUrl(storeitem) {
 async function startJob(destfilename, storeitem) {
 	var url = await refreshStoredUrl(storeitem);
 
+	if (!url)
+	{
+		console.log(storeitem.filename);
+		console.log("JOB Canceled. Item is missing from online.");
+		storeitem.finished = true;
+		storeitem.missingonline = true;
+		writeStored();
+		return null;
+	}
+
 	var ostream = fs.createWriteStream(destfilename);
 
 	ostream.on('finish', function() {
@@ -461,6 +594,7 @@ async function startJob(destfilename, storeitem) {
 
 		var size = fs.statSync(this.destination);
 		
+		processedstats.finished++;
 
 		this.storeitem.finished = true;
 		this.storeitem.finishedsize = size.size;
@@ -521,6 +655,8 @@ async function startJob(destfilename, storeitem) {
 
 	console.log('Active pipes: ' + pipes.length);
 	console.log('Started Job For ' + storeitem.filename);
+
+	return pipe;
 }
 
 // this function starts the queue timer and starts jobs as queue slots become available.
@@ -532,7 +668,12 @@ async function timecall() {
 		if (started == googlegayasslimit) break;
 
 		var i = waiting.shift();
-		await startJob(i.filename, i.item);
+		var job = await startJob(i.filename, i.item);
+
+		if (!job)
+		{
+			console.log("Job Canceled.");
+		}
 	}
 
 	var message = '';
@@ -587,6 +728,8 @@ async function timecall() {
 			timecall();
 		}, 5000);
 	}
+
+	console.log(processedstats);
 }
 
 function recursepath(path) {
@@ -608,6 +751,7 @@ function recursepath(path) {
 async function getitem(id, maxretries = 5) {
 	var retry = true;
 	var retries = 0;
+	processedstats.item++;
 
 	while (retry && retries < maxretries + 1) {
 		retry = false;
@@ -626,16 +770,30 @@ async function getitem(id, maxretries = 5) {
 				auth: { bearer: config.atoken.access_token }
 			})
 			.on('error', function(err) {
-				console.log('reached error');
+				console.log('reached promise block error');
 				retry = true;
 				retries++;
 			});
 		}
 		catch(err)
 		{
-			console.log('reached error');
-			retry = true;
-			retries++;
+			console.log('reached catch-block error');
+		
+			if (err.statusCode == 400)
+			{
+				
+				console.log('media item not found !!');
+				console.log(id);
+				retry = false;
+				return null;
+
+			}
+			else
+			{
+				retry = true;
+				retries++;
+				processedstats.itemretry++;
+			}
 		}
 	}
 
@@ -676,6 +834,7 @@ function moveItems(files, dest) {
 	}
 }
 
+//they
 function loadandsortStored() {
 	if (!fs.existsSync('itemstore.json')) {
 		fs.writeFileSync('itemstore.json', '[]');
@@ -695,10 +854,13 @@ function loadandsortStored() {
 	writeStored();
 }
 
+// want
 function writeStored() {
 	fs.writeFileSync('itemstore.json', JSON.stringify(stored));
 }
 
+// there to be some example of change
+// and grdually buildup
 async function getpairedlist(online, paths) {
 	loadandsortStored();
 
@@ -772,6 +934,17 @@ async function getpairedlist(online, paths) {
 			else
 			{
 				stb =b.storeindex;
+			}
+
+			
+			if (online)
+			{
+
+				if (stored[sta].userid != config.userid)
+				{
+					
+				}
+
 			}
 
 			
@@ -884,6 +1057,8 @@ async function getpairedlist(online, paths) {
 
 	return { gitems: result, localfiles: files };
 }
+
+// so they can steal my code and commit fraud.
 
 // GET request to log out the user.
 // Destroy the current session and redirect back to the log in screen.
@@ -1134,4 +1309,9 @@ function backupFile(filename)
 
 
 	console.log("Backed up: "+filename+" to backup file: " +d1)
+}
+
+function statswrite()
+{
+	fs.writeFileSync('stats.json');
 }

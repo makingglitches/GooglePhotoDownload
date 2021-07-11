@@ -7,11 +7,31 @@
         {
             "type": "pwa-node",
             "request": "launch",
-            "name": "Launch Program",
+            "name": "Downloader",
             "skipFiles": [
                 "<node_internals>/**"
             ],
             "program": "${workspaceFolder}/index.js",
+            "console": "externalTerminal"
+        },
+        {
+            "type": "pwa-node",
+            "request": "launch",
+            "name": "Account Stats",
+            "skipFiles": [
+                "<node_internals>/**"
+            ],
+            "program": "${workspaceFolder}/countacc.js",
+            "console": "externalTerminal"
+        },
+        {
+            "type": "pwa-node",
+            "request": "launch",
+            "name": "Space Comp",
+            "skipFiles": [
+                "<node_internals>/**"
+            ],
+            "program": "${workspaceFolder}/spacecomp.js",
             "console": "externalTerminal"
         }
     ]
