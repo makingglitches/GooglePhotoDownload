@@ -834,7 +834,7 @@ function moveItems(files, dest) {
 	}
 }
 
-//they
+
 function loadandsortStored() {
 	if (!fs.existsSync('itemstore.json')) {
 		fs.writeFileSync('itemstore.json', '[]');
@@ -854,13 +854,11 @@ function loadandsortStored() {
 	writeStored();
 }
 
-// want
 function writeStored() {
 	fs.writeFileSync('itemstore.json', JSON.stringify(stored));
 }
 
-// there to be some example of change
-// and grdually buildup
+
 async function getpairedlist(online, paths) {
 	loadandsortStored();
 
@@ -1058,10 +1056,8 @@ async function getpairedlist(online, paths) {
 	return { gitems: result, localfiles: files };
 }
 
-// so they can steal my code and commit fraud.
 
-// GET request to log out the user.
-// Destroy the current session and redirect back to the log in screen.
+
 
 function checkauth(req) {
 	return config.atoken.access_token;
