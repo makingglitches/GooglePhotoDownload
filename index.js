@@ -546,6 +546,8 @@ async function refreshStoredUrl(storeitem) {
 
 		storeitem.finished = true;
 
+		fs.appendFileSync('missingids.txt', storeitem.userid+"\n"+storeitem.filename+"\n"+  storeitem.id+"\n");
+
 		processedstats.missingonline++;
 
 		return null;
@@ -592,6 +594,8 @@ async function startJob(destfilename, storeitem) {
 	ostream.on('finish', function() {
 		console.log(' PIPE FINISHED !: ' + this.filename);
 
+		if (!storeitem.error)
+		{
 		var size = fs.statSync(this.destination);
 		
 		processedstats.finished++;
@@ -599,10 +603,17 @@ async function startJob(destfilename, storeitem) {
 		this.storeitem.finished = true;
 		this.storeitem.finishedsize = size.size;
 		console.log("finished size: "+this.storeitem.finishedsize);
+		}
+		else
+		{
+			console.log("Request promise sent error.")
+		}
+
 		console.log("===>Id:"+storeitem.id);
 		writeStored();
 
 		pipes.splice(pipes.indexOf(this), 1);
+		
 	});
 
 	ostream.on('error', function(err) {
@@ -610,12 +621,14 @@ async function startJob(destfilename, storeitem) {
 		console.log(err);
 	});
 
-	var pipe = request.get(url + '=d' + storeitem.voption);
+	var req = request.get(url + '=d' + storeitem.voption);
 
-	pipe.on('error', function(err) {
+	req.on('error', function(err) {
 		console.log('error with ' + this.filename);
 		console.log('placing job back in queue.');
-		var id = this.path.replace('/', '');
+
+		var id =this.storeitem.id;
+		// this.path.replace('/', '');
 
 		var pipeindex = -1;
 
@@ -637,26 +650,40 @@ async function startJob(destfilename, storeitem) {
 
 		pipes.splice(i, 1);
 
+		p.storeitem.finished=false;
+		p.storeitem.error = true;
+
 		pushtoQueue(p.destination, p.storeitem);
 	});
 
-	pipe.catch(function(err) {
+	req.catch(function(err) {
 		var issue = err;
 	});
 
-	pipe = pipe.pipe(ostream);
 
-	pipe.storeitem = storeitem;
-	pipe.filename = storeitem.filename;
-	pipe.expectedSize = storeitem.size;
-	pipe.destination = destfilename;
+	// this is still the request promise.
+	req.storeitem = storeitem;
+	req.filename = storeitem.filename;
+	req.destination = destfilename;
+	req.expectedSize = storeitem.size;
 
-	pipes.push(pipe);
+
+	// this is the ouput stream, maybe rename some shit ? LOL
+	req.pipe(ostream);
+
+	ostream.storeitem = storeitem;
+	ostream.filename = storeitem.filename;
+	ostream.expectedSize = storeitem.size;
+	ostream.destination = destfilename;
+	// tag the stream with the request object just in case we need to reference this.
+	ostream.req = req;
+
+	pipes.push(ostream);
 
 	console.log('Active pipes: ' + pipes.length);
 	console.log('Started Job For ' + storeitem.filename);
 
-	return pipe;
+	return ostream;
 }
 
 // this function starts the queue timer and starts jobs as queue slots become available.
