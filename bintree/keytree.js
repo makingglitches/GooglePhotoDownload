@@ -11,7 +11,13 @@ function createLevel(level, parent) {
 	level.parent = parent;
 }
 
-function addToTree(tree, key, index = 0, keypath,tag) {
+function addToTree(tree, key,  tag, index=0, keypath = null) {
+	
+	if (!keypath)
+	{
+		keypath = [];
+	}
+
 	if (!tree.categories) {
 		createLevel(tree);
 	}
@@ -40,10 +46,10 @@ function addToTree(tree, key, index = 0, keypath,tag) {
 
 			tree.keys.push(obj);
 			tree.count++;
-			return { tree: tree, obj: obj, dup: false, exists: true, keypath:keypath };
+			return { tree: tree, obj: obj, existed: true, keypath:keypath, found:false };
 		} else {
 			console.log('duplicate key ' + key);
-			return { tree: tree, obj: obj, dup: true, exists: true, keypath:keypath };
+			return { tree: tree, obj: obj, existed: false, keypath:keypath, found:true };
 		}
 	} else {
 		var c = key[index];
@@ -58,11 +64,17 @@ function addToTree(tree, key, index = 0, keypath,tag) {
 
 		index++;
 		// big fan of sensible recursion in js.
-		return addToTree(tree.categories[c], key, index, keypath, tag);
+		return addToTree(tree.categories[c], key, tag,index, keypath);
 	}
 }
 
-function findInTree(tree, key, keypath, index=0) {
+function findInTree(tree, key, index=0, keypath=null) {
+	
+	if (!keypath)
+	{
+		keypath = [];
+	}
+
 	if (index == key.length) {
 		var found = false;
 		var obj = null;
@@ -87,7 +99,7 @@ function findInTree(tree, key, keypath, index=0) {
 		if (tree.categories &&  tree.categories[c]) {
 			keypath.push(c);
 			index++;
-			return findInTree(tree.categories[c], key, keypath, index);
+			return findInTree(tree.categories[c], key, index, keypath);
 		} else {
 			return { found: false, tree: tree, keypath: keypath, obj: null };
 		}

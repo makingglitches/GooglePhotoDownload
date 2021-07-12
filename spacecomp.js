@@ -1,7 +1,7 @@
 const { json } = require('express');
 const fs = require('fs');
 const path = require('path');
-const keytree = require('./bintree/keytree');
+const keytree = require('./bintree/keytree')
 
 var files = fs.readdirSync('.', { withFileTypes: true });
 
@@ -34,38 +34,18 @@ for (var f in files) {
 				var tempitem = tempitems[i];
 
 				if (tempitem.id && tempitem.originalsize) {
-					var keypath = [];
-					var found = keytree.findInTree(orisizes, tempitem.id, keypath);
+					var found = keytree.findInTree(orisizes,tempitem.id);
 
 					if (!found.found) {
-						keytree.addToTree(orisizes, tempitem.id, 0, keypath, {
+						keytree.addToTree(orisizes, tempitem.id,  {
 							id: tempitem.id,
 							ori: tempitem.originalsize
 						});
 					} else {
-						if (tempitem.originalsize > found.obj.ori) {
-							obj.ori = tempitem.originalsize;
+						if (tempitem.originalsize > found.obj.tag.ori) {
+							found.obj.tag.ori = tempitem.originalsize;
 						}
 					}
-
-					// for (var o in orisizes)
-					// {
-					//     if (orisizes[o].id == tempitems[i].id)
-					//     {
-					//         found= true;
-
-					//         if (orisizes[o].id == tempitems[i].id &&
-					//              tempitems[i].originalsize > orisizes[o].originalsize)
-					//         {
-					//             orisizes[o].id == tempitems[i].originalsize;
-					//         }
-					//         break;
-					//     }
-
-					// }
-					// if (found ) continue;
-
-					// orisizes.push({id:tempitems.id, ori:tempitems.originalsize});
 				}
 			}
 		}
@@ -106,25 +86,15 @@ function toPerc(val) {
 
 for (var i in items) {
 	var item = items[i];
-	var kp = [];
+	
 
-	var oriitem = keytree.findInTree(orisizes, item.id, kp);
+	var oriitem = keytree.findInTree(orisizes, item.id);
 
 	if (oriitem.found) {
 		if (oriitem.obj.tag.ori > item.originalsize) {
 			item.originalsize = oriitem.obj.tag.ori;
 		}
 	}
-
-	// for (var o in origsize)
-	// {
-	//     if (item.id == orisizes[o].id)
-	//     {
-	//         console.log('found original size.');
-	//         item.originalsize = orisizes[o].originalsize;
-	//         break;
-	//     }
-	// }
 
 	var finsize = 0;
 
@@ -170,8 +140,8 @@ console.log('There are ' + items.length + ' items in the google photos store.');
 console.log('There are ' + countorig + ' items which are tracking their original size.');
 console.log('There are ' + nosize + ' items which do not have their server size info updated.');
 console.log();
-console.log('Original Size: ' + toGB(origsize) + ' New Size: ' + toGB(newsize));
-console.log(' Total To Download: ' + toGB(totalDL) + '  Already Downloaded:' + toGB(alreadydl));
+console.log('Of Tracked Original Size: ' + toGB(origsize) + ' New Size: ' + toGB(newsize));
+console.log('Total To Download: ' + toGB(totalDL) + '  Already Downloaded:' + toGB(alreadydl));
 console.log('Of the items being tracked transcoding saved ' + toGB(origsize - newsize));
 console.log(
 	'There are still yet ' +
