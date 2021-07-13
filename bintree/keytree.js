@@ -12,7 +12,8 @@ function createLevel(level, parent) {
 }
 
 function addToTree(tree, key,  tag, index=0, keypath = null) {
-	begindate = Date.now()
+	var begindate = Date.now();
+	var tt =0;
 
 	if (!keypath)
 	{
@@ -47,7 +48,7 @@ function addToTree(tree, key,  tag, index=0, keypath = null) {
 
 			tree.keys.push(obj);
 			tree.count++;
-			tt = date.now() - begindate;
+			tt = Date.now() - begindate;
 
 			return { tree: tree, time:tt, obj: obj, existed: true, keypath:keypath, found:false };
 		} else {
@@ -76,7 +77,9 @@ function addToTree(tree, key,  tag, index=0, keypath = null) {
 }
 
 function findInTree(tree, key, index=0, keypath=null) {
-	begindate = Date.now()
+	var begindate = Date.now();
+	var tt = 0;
+	
 	if (!keypath)
 	{
 		keypath = [];
