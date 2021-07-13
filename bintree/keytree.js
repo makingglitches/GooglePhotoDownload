@@ -12,7 +12,8 @@ function createLevel(level, parent) {
 }
 
 function addToTree(tree, key,  tag, index=0, keypath = null) {
-	
+	begindate = Date.now()
+
 	if (!keypath)
 	{
 		keypath = [];
@@ -46,10 +47,13 @@ function addToTree(tree, key,  tag, index=0, keypath = null) {
 
 			tree.keys.push(obj);
 			tree.count++;
-			return { tree: tree, obj: obj, existed: true, keypath:keypath, found:false };
+			tt = date.now() - begindate;
+
+			return { tree: tree, time:tt, obj: obj, existed: true, keypath:keypath, found:false };
 		} else {
+			tt = Date.now() - begindate
 			console.log('duplicate key ' + key);
-			return { tree: tree, obj: obj, existed: false, keypath:keypath, found:true };
+			return { tree: tree, time:tt, obj: obj, existed: false, keypath:keypath, found:true };
 		}
 	} else {
 		var c = key[index];
@@ -63,13 +67,16 @@ function addToTree(tree, key,  tag, index=0, keypath = null) {
         keypath.push(c);
 
 		index++;
+		tt = Date.now() - begindate
 		// big fan of sensible recursion in js.
-		return addToTree(tree.categories[c], key, tag,index, keypath);
+		var res = addToTree(tree.categories[c], key, tag,index, keypath);
+		res.time+=tt;
+		return res;
 	}
 }
 
 function findInTree(tree, key, index=0, keypath=null) {
-	
+	begindate = Date.now()
 	if (!keypath)
 	{
 		keypath = [];
@@ -89,9 +96,11 @@ function findInTree(tree, key, index=0, keypath=null) {
 		}
 
 		if (!found) {
-			return { found: false, tree: tree, keypath: keypath, obj: null };
+			tt = Date.now() - begindate
+			return { found: false, time: tt, tree: tree, keypath: keypath, obj: null };
 		} else {
-			return { found: true, tree: tree, keypath: keypath, obj: obj };
+			tt = Date.now() - begindate
+			return { found: true, time: tt, tree: tree, keypath: keypath, obj: obj };
 		}
 	} else {
 		var c = key[index];
@@ -99,9 +108,13 @@ function findInTree(tree, key, index=0, keypath=null) {
 		if (tree.categories &&  tree.categories[c]) {
 			keypath.push(c);
 			index++;
-			return findInTree(tree.categories[c], key, index, keypath);
+			tt = Date.now() - begindate
+			var res = findInTree(tree.categories[c], key, index, keypath);
+			res.time+=tt;
+			return res;
 		} else {
-			return { found: false, tree: tree, keypath: keypath, obj: null };
+			tt = Date.now() - begindate
+			return { found: false, time:tt, tree: tree, keypath: keypath, obj: null };
 		}
 	}
 }

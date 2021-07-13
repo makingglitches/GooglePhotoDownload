@@ -91,7 +91,8 @@ const { json } = require('express');
 const { WSAENOTSOCK } = require('constants');
 const { exception } = require('console');
 const { CONNREFUSED } = require('dns');
-const bintree = require('./bintree/bintree.js');
+
+
 
 auth(passport);
 
@@ -830,7 +831,8 @@ function loadandsortStored() {
 			item.userinstance = [];
 		}
 
-		keytree.addToTree(storetree, item.id, item);
+		var kti = keytree.addToTree(storetree, item.id, item);
+		processedstats.storetreeadd+=kti.time;
 	}
 
 	writeStored();
@@ -880,12 +882,14 @@ async function getpairedlist(online, paths) {
 		var base = path.basename(f);
 
 		var i = keytree.findInTree(filetree, base);
+		processedstats.storetreefind+=i.time;
 
 		if (i.found) {
 			i.obj.tag.push(path.dirname(f));
 		} else {
 			var patha = [ path.dirname(f) ];
-			keytree.addToTree(filetree, base, patha);
+			var kti = keytree.addToTree(filetree, base, patha);
+			processedstats.storetreeadd+=kti.time;
 		}
 	}
 
@@ -896,8 +900,10 @@ async function getpairedlist(online, paths) {
 		// so they can be compared and deleted.
 		result.sort(function(a, b) {
 			var sta = keytree.findInTree(storetree, a.id).obj.tag;
+			processedstats.storetreefind+=sta.time;
 
 			var stb = keytree.findInTree(storetree, b.id).obj.tag;
+			processedstats.storetreefind+=stb.time;
 
 			if (online) {
 				var updated = false;
@@ -933,7 +939,7 @@ async function getpairedlist(online, paths) {
 					updated = true;
 				}
 
-				writeStored();
+			//	writeStored();
 			}
 
 			var contai = keytree.findInTree(filetree, a.filename);
@@ -1069,7 +1075,8 @@ async function listItems() {
 			stored.push(newitem);
 
 			var keypath = [];
-			keytree.addToTree(storetree, newitem.id, newitem);
+			var kti = keytree.addToTree(storetree, newitem.id, newitem);
+			processedstats.storetreeadd+=kti.time;
 		}
 	}
 
