@@ -40,7 +40,9 @@ var processedstats = {
 	itemretry: 0,
 	item: 0,
 	wroteStored: 0,
-	loadedStored: 0
+	loadedStored: 0,
+	storetreeadd:0,
+	storetreefind:0
 };
 
 loadandsortStored();
@@ -340,7 +342,7 @@ function acallback(arg1, arg2, arg3, arg4) {
 }
 
 app.get('/upload', async (req, res) => {
-	testUpload();
+	testUpload('./images.jpeg');
 });
 
 // Start the OAuth login process for Google.
@@ -882,6 +884,7 @@ async function getpairedlist(online, paths) {
 		var base = path.basename(f);
 
 		var i = keytree.findInTree(filetree, base);
+	
 		processedstats.storetreefind+=i.time;
 
 		if (i.found) {
@@ -889,7 +892,7 @@ async function getpairedlist(online, paths) {
 		} else {
 			var patha = [ path.dirname(f) ];
 			var kti = keytree.addToTree(filetree, base, patha);
-			processedstats.storetreeadd+=kti.time;
+			processedstats.storetreeadd+=kti?kti.time:0;
 		}
 	}
 
@@ -899,11 +902,15 @@ async function getpairedlist(online, paths) {
 		// if originals are on server already, to save disk space download these first.
 		// so they can be compared and deleted.
 		result.sort(function(a, b) {
-			var sta = keytree.findInTree(storetree, a.id).obj.tag;
-			processedstats.storetreefind+=sta.time;
+			var resa = keytree.findInTree(storetree, a.id);
+			var sta = resa.obj.tag;
+			
+			processedstats.storetreefind+=resa.time;
 
-			var stb = keytree.findInTree(storetree, b.id).obj.tag;
-			processedstats.storetreefind+=stb.time;
+			var resb =keytree.findInTree(storetree, b.id); 
+			var stb = resb.obj.tag;
+
+			processedstats.storetreefind+=resb.time;
 
 			if (online) {
 				var updated = false;
@@ -1229,23 +1236,65 @@ function loadUserStore() {
 	}
 }
 
+// this doesn't seem possible without verifying the stupid app
+// the authorization scopes are set and PROBLEMO
 function testUpload(filename) {
-	var req = https.request('https://www.google.com', { method: 'get' });
+//	var req = https.request('https://www.google.com', { method: 'get' });
+
+	console.log("Uploading file: "+filename);
 
 	var mt = mime.lookup(filename);
+
 	var options = {
+		method:'POST',
+		port:443,
+		// if authorization is set in an 'auth' field or not set it fucks up the whole request 
+		// node itself throws a buried deep exception.
 		headers: {
 			'Content-Type': 'application/octet-stream',
 			'X-Goog-Upload-Content-Type': mt,
-			'X-Goog-Upload-Protocol': 'raw'
-		},
-
-		auth: {
-			bearer: config.atoken.access_token
+			'X-Goog-Upload-Protocol': 'raw',
+			'Authorization': 'Bearer '+config.atoken.access_token
 		}
 	};
 
-	request.post('https://photoslibrary.googleapis.com/v1/uploads', options);
+	var bytesreq = https.request('https://photoslibrary.googleapis.com/v1/uploads', options, function(res)
+	{
+
+		console.log('reached response.');
+			res.on('data', function(d)
+			{
+				console.log("upload result data:");
+				console.log(d.toString());
+			});
+	});
+
+
+	var buf = Buffer.alloc(10*1024*1024);
+
+
+	var infile = fs.openSync(filename,"r");
+
+	var bread = fs.readSync(infile,buf,0,10*1024*1024) 
+	
+	while ( bread > 0)
+	{
+		if (bread < 10*1024*1024)
+		{
+			var destbuff =  Buffer.alloc(bread)
+			buf.copy(destbuff,0,0,bread);
+			bytesreq.write(destbuff);
+
+		}
+		else
+		{
+			bytesreq.write(buf);
+		}
+
+		bread = fs.readSync(infile,buf,0,10*1024*1024) 		
+	}
+
+	bytesreq.end();
 }
 
 function backupFile(filename) {
@@ -1256,7 +1305,7 @@ function backupFile(filename) {
 
 	var d1 = dir + path.sep + fn + '-backup-' + ds + ext;
 
-	fs.copyFileSync('itemstore.json', d1);
+	fs.copyFileSync(filename, d1);
 
 	console.log('Backed up: ' + filename + ' to backup file: ' + d1);
 }
@@ -1264,3 +1313,5 @@ function backupFile(filename) {
 function statswrite() {
 	fs.writeFileSync('stats.json');
 }
+
+

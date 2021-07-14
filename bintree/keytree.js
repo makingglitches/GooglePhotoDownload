@@ -48,13 +48,18 @@ function addToTree(tree, key,  tag, index=0, keypath = null) {
 
 			tree.keys.push(obj);
 			tree.count++;
+
 			tt = Date.now() - begindate;
 
 			return { tree: tree, time:tt, obj: obj, existed: true, keypath:keypath, found:false };
+
 		} else {
+
 			tt = Date.now() - begindate
 			console.log('duplicate key ' + key);
+
 			return { tree: tree, time:tt, obj: obj, existed: false, keypath:keypath, found:true };
+
 		}
 	} else {
 		var c = key[index];
@@ -68,10 +73,12 @@ function addToTree(tree, key,  tag, index=0, keypath = null) {
         keypath.push(c);
 
 		index++;
+
 		tt = Date.now() - begindate
 		// big fan of sensible recursion in js.
 		var res = addToTree(tree.categories[c], key, tag,index, keypath);
 		res.time+=tt;
+
 		return res;
 	}
 }
@@ -79,7 +86,7 @@ function addToTree(tree, key,  tag, index=0, keypath = null) {
 function findInTree(tree, key, index=0, keypath=null) {
 	var begindate = Date.now();
 	var tt = 0;
-	
+
 	if (!keypath)
 	{
 		keypath = [];
@@ -99,24 +106,35 @@ function findInTree(tree, key, index=0, keypath=null) {
 		}
 
 		if (!found) {
+
 			tt = Date.now() - begindate
+
 			return { found: false, time: tt, tree: tree, keypath: keypath, obj: null };
 		} else {
+
 			tt = Date.now() - begindate
+
 			return { found: true, time: tt, tree: tree, keypath: keypath, obj: obj };
 		}
 	} else {
+		
 		var c = key[index];
 
 		if (tree.categories &&  tree.categories[c]) {
 			keypath.push(c);
 			index++;
+
 			tt = Date.now() - begindate
+
 			var res = findInTree(tree.categories[c], key, index, keypath);
 			res.time+=tt;
+
 			return res;
+
 		} else {
+
 			tt = Date.now() - begindate
+
 			return { found: false, time:tt, tree: tree, keypath: keypath, obj: null };
 		}
 	}
