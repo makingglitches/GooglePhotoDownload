@@ -33,6 +33,26 @@
             ],
             "program": "${workspaceFolder}/spacecomp.js",
             "console": "externalTerminal"
+        },
+        {
+            "type": "pwa-node",
+            "request": "launch",
+            "name": "Test Store",
+            "skipFiles": [
+                "<node_internals>/**"
+            ],
+            "program": "${workspaceFolder}/teststore.js",
+            "console": "externalTerminal"
+        },
+        {
+            "type": "pwa-node",
+            "request": "launch",
+            "name": "Migrate Item Store",
+            "skipFiles": [
+                "<node_internals>/**"
+            ],
+            "program": "${workspaceFolder}/migrateitemstore.js",
+            "console": "externalTerminal"
         }
     ]
 }

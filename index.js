@@ -169,12 +169,17 @@ app.post('/redownloadstart', async (req, res) => {
 		res.status(500).send('Problem, need to load a list of photo api mediaitems first.');
 	}
 
-	for (var i in pairs.gitems) {
+
+	var orilen = pairs.gitems.length;
+
+//for (var i in pairs.gitems) {
+	while (pairs.gitems.length >0 )
+	{
 		processedstats.total++;
 
-		console.log('At index ' + i + ' of ' + pairs.gitems.length);
+		console.log('At index ' + i + ' of ' + orilen);
 
-		var item = pairs.gitems[i];
+		var item = pairs.gitems.pop();
 
 		var res = keytree.findInTree(storetree, item.id);
 		var storeitem = null;
@@ -309,7 +314,11 @@ app.post('/redownloadstart', async (req, res) => {
 
 			if (!storeitem.finished) pushtoQueue(destfilename, storeitem, config.atoken.access_token);
 		}
+		
+		i++;
 	}
+
+
 
 	endtimer = true;
 });
@@ -806,6 +815,7 @@ function moveItems(files, dest) {
 }
 
 function loadandsortStored() {
+
 	processedstats.loadedStored++;
 
 	if (!fs.existsSync('itemstore.json')) {
@@ -814,7 +824,65 @@ function loadandsortStored() {
 
 	storetree = {};
 
-	stored = JSON.parse(fs.readFileSync('itemstore.json'));
+	var noerror = false;
+	var lastbackup = null;
+	
+	var files = fs.readdirSync(".");
+
+	files = files.map(function(f) {
+		if (f.startsWith("itemstore.json-backup"))
+		{
+			return f;
+		}
+		else
+		{
+			return '';
+		}
+	});
+
+	files = lodash.remove(files, function (s)
+	{
+		return s!='';
+	});
+
+
+	files.sort();
+
+	while (!noerror)
+	{
+
+		noerror = true;
+		lastbackup = null;
+
+		if (files.length > 0)
+		{
+			lastbackup = files.pop()
+		}
+
+		try
+		{
+			stored = JSON.parse(fs.readFileSync('itemstore.json'));
+		}
+		catch(err)
+		{	
+			noerror = false;
+
+			console.log("Itemstore corrupted, restoring.");
+
+			if (lastbackup == null)
+			{
+				console.log("There are no more backup files to try.")
+				console.log("Parse error, cannot load itemstore regen.");
+				stored = [];
+				writeStored();
+			}
+			else
+			{
+				fs.copyFileSync(lastbackup, "itemstore.json");
+			}
+		}
+
+	}
 
 	stored.sort(function(a, b) {
 		if (a.userid == config.userid && b.userid != config.userid) return -1;
