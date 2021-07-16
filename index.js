@@ -25,7 +25,7 @@ const nodownload = false;
 var atoken = {};
 
 var storetree = {};
-var queuetree = {};
+//var queuetree = {};
 
 var processedstats = {
 	userid: '',
@@ -1023,15 +1023,15 @@ async function getpairedlist(online, paths) {
 	}
 
 
-	queuetree = {};
+	//queuetree = {};
 
-	if (online)
-	{
-		for (var i in result)
-		{
-			keytree.addToTree(queuetree, result[i].id);
-		}
-	}
+	// if (online)
+	// {
+	// 	for (var i in result)
+	// 	{
+	// 		keytree.addToTree(queuetree, result[i].id);
+	// 	}
+	// }
 
 	writeStored();
 
