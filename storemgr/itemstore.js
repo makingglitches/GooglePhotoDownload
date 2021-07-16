@@ -79,6 +79,9 @@ async function SetVOption(db, id, voption) {
 	return r.success;
 }
 
+
+
+
 async function AddStoreItem(db, id, filename, userid) {
 	var r = await 
     getrows(db, 'insert into StoreItem(id,filenameonserver,userid) values (?, ?, ?)', [
@@ -179,5 +182,6 @@ module.exports = {
 	GetById:GetById,
     queryResult:queryResult,
     GetItems: GetItems,
-    GetUnfinishedItems: GetUnfinishedItems
+    GetUnfinishedItems: GetUnfinishedItems,
+    getrows:getrows
 };
