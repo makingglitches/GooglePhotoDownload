@@ -209,44 +209,6 @@ app.post('/redownloadstart', async (req, res) => {
 			continue;
 		}
 
-		// if the userinstance field hasnt been defined, define it.
-		// if (!storeitem.userinstance) {
-		// 	storeitem.userinstance = [];
-		// 	writeStored();
-		// }
-
-		// if the online flag is sent that means the download list has been
-		// sampled from the current online account.
-		// if (online && storeitem.userinstance.indexOf(config.userid) == -1) {
-		// 	// add the current user to the list.
-		// 	storeitem.userinstance.push(config.userid);
-		// }
-
-		// this is a carry over.
-		// if (storeitem.userid != config.userid) {
-		// 	// if we have drawn the list from online
-		// 	// set the existing userid which is from the itemstore
-		// 	// into the userinstance field for future code updates.
-		// 	if (online) {
-		// 		if (online && storeitem.userinstance.indexOf(storeitem.userid) == -1) {
-		// 			storeitem.userinstance.push(storeitem.userid);
-		// 			storeitem.userid = config.userid;
-		// 			writeStored();
-		// 		}
-		// 	} else {
-		// 		// this is the new way.
-		// 		// if the item has been updated as it should have
-		// 		// because there is a possibility it could be shared across multiple accounts
-		// 		// this indicates google is hashing images if they are deemed duplicates
-		// 		// creating ids that exist between different accounts
-		// 		// that indicates the possibility of media duplicate detection
-		// 		// should later generate a list of items to delete.
-		// 		if (config.userinstance.indexOf(storeitem.userid) == -1) {
-		// 			console.log('Item is from different user account');
-		// 			continue;
-		// 		}
-		// 	}
-		// }
 
 		// download headers have not been pulled back if expected size is -1
 		if (!storeitem.size || storeitem.size == -1) {
@@ -388,46 +350,6 @@ app.get('/albums', async (req, res) => {
 	}
 });
 
-
-// app.get('/userinstance', async(req,res) =>
-// {
-// 	// i am suspecting that some store corruption occurred but i want to be sure.
-// 	// it woudl reduce the size of the store a bit if I could find
-// 	// that the reason items were not unqiue is because they showed up
-// 	// due to a code error.
-// 	if (pairs)
-// 	{
-// 		var baduserinstance = 0;
-
-// 		for (var i in stored )
-// 		{
-// 			var storeitem = stored[i];
-
-// 			var f = keytree.findInTree( queuetree, storeitem.id);
-			
-// 			if (storeitem.userinstance.indexOf(config.userid) > -1)
-// 			{
-// 				if (!f.found)
-// 				{
-					
-// 					storeitem.userinstance = lodash.remove(
-// 					function (u)
-// 					{
-// 						return u != config.userid;
-// 					}
-// 					);
-
-// 					baduserinstance++;
-// 				}
-// 			}
-
-// 		}
-
-// 		console.log("there were "+baduserinstance+' bad user instances');
-// 		writeStored();
-// 	}
-
-// });
 
 app.get(
 	'/auth/google/callback',
@@ -945,10 +867,6 @@ function loadandsortStored() {
 		var keypath = [];
 		var item = stored[i];
 
-		// if (!item.userinstance) {
-		// 	item.userinstance = [];
-		// }
-
 		var kti = keytree.addToTree(storetree, item.id, item);
 		processedstats.storetreeadd+=kti.time;
 	}
@@ -1028,42 +946,7 @@ async function getpairedlist(online, paths) {
 
 			processedstats.storetreefind+=resb.time;
 
-			if (online) {
-				var updated = false;
-				// if online flag is set all the items in the list are matched against online items
-				// therefore update the store items userinstance and userids
-				if (sta.userid != config.userid) {
-					// if (sta.userinstance.indexOf(sta.userid) == -1) {
-					// 	sta.userinstance.push(sta.userid);
-					// }
-
-					sta.userid = config.userid;
-					updated = true;
-				}
-
-				// if (sta.userinstance.indexOf(config.userid) == -1) {
-				// 	sta.userinstance.push(config.userid);
-				// 	updated = true;
-				// }
-
-				sta.userid = config.userid;
-
-				if (stb.userid != config.userid) {
-					// if (stb.userinstance.indexOf(stb.userid) == -1) {
-					// 	stb.userinstance.push(stb.userid);
-					// }
-
-					stb.userid = config.userid;
-					updated = true;
-				}
-
-				// if (stb.userinstance.indexOf(config.userid) == -1) {
-				// 	stb.userinstance.push(config.userid);
-				// 	updated = true;
-				// }
-
-			//	writeStored();
-			}
+		
 
 			var contai = keytree.findInTree(filetree, a.filename);
 			var contbi = keytree.findInTree(filetree, b.filename);
@@ -1208,7 +1091,6 @@ async function listItems() {
 
 			stored.push(newitem);
 
-			var keypath = [];
 			var kti = keytree.addToTree(storetree, newitem.id, newitem);
 			processedstats.storetreeadd+=kti.time;
 		}
