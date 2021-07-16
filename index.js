@@ -22,10 +22,7 @@ const keytree = require('./bintree/keytree');
 
 const nodownload = false;
 
-var atoken = {};
-
 var storetree = {};
-//var queuetree = {};
 
 var processedstats = {
 	userid: '',
@@ -1022,16 +1019,6 @@ async function getpairedlist(online, paths) {
 		});
 	}
 
-
-	//queuetree = {};
-
-	// if (online)
-	// {
-	// 	for (var i in result)
-	// 	{
-	// 		keytree.addToTree(queuetree, result[i].id);
-	// 	}
-	// }
 
 	writeStored();
 
