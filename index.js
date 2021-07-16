@@ -642,10 +642,10 @@ async function timecall() {
 			rate = (pipes[i].bytesWritten - pipes[i].lastbytes) / (Date.now() - pipes[i].lastdate) / 1024 * 1000;
 		}
 
-		if (pipes[i].bytesWritten > pipes[i].storeitem.size && !pipes[i].wrote) {
-			fs.appendFileSync('mismatched.txt', pipes[i].filename + '\n');
-			pipes[i].wrote = true;
-		}
+		// if (pipes[i].bytesWritten > pipes[i].storeitem.size && !pipes[i].wrote) {
+		// 	fs.appendFileSync('mismatched.txt', pipes[i].filename + '\n');
+		// 	pipes[i].wrote = true;
+		// }
 
 		var perc = pipes[i].bytesWritten / pipes[i].storeitem.size * 100;
 
