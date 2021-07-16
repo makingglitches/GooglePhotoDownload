@@ -25,6 +25,7 @@ const nodownload = false;
 var atoken = {};
 
 var storetree = {};
+var queuetree = {};
 
 var processedstats = {
 	userid: '',
@@ -137,6 +138,7 @@ app.use((req, res, next) => {
 	next();
 });
 
+
 app.get('/', (req, res) => {
 	if (!req.user || !req.isAuthenticated()) {
 		console.log('sending user to authenticate page.');
@@ -172,10 +174,14 @@ app.post('/redownloadstart', async (req, res) => {
 
 	var orilen = pairs.gitems.length;
 
+	var i =0;
+
 //for (var i in pairs.gitems) {
 	while (pairs.gitems.length >0 )
 	{
 		processedstats.total++;
+
+		i++;
 
 		console.log('At index ' + i + ' of ' + orilen);
 
@@ -187,6 +193,8 @@ app.post('/redownloadstart', async (req, res) => {
 		if (res.found) {
 			storeitem = res.obj.tag;
 		}
+
+		keytree.removeFromTree(storetree,item.id);
 
 		// indicate item is most definately online.
 		// because this flag means that this data was loaded from the server prior to run.
@@ -202,43 +210,43 @@ app.post('/redownloadstart', async (req, res) => {
 		}
 
 		// if the userinstance field hasnt been defined, define it.
-		if (!storeitem.userinstance) {
-			storeitem.userinstance = [];
-			writeStored();
-		}
+		// if (!storeitem.userinstance) {
+		// 	storeitem.userinstance = [];
+		// 	writeStored();
+		// }
 
 		// if the online flag is sent that means the download list has been
 		// sampled from the current online account.
-		if (online && storeitem.userinstance.indexOf(config.userid) == -1) {
-			// add the current user to the list.
-			storeitem.userinstance.push(config.userid);
-		}
+		// if (online && storeitem.userinstance.indexOf(config.userid) == -1) {
+		// 	// add the current user to the list.
+		// 	storeitem.userinstance.push(config.userid);
+		// }
 
 		// this is a carry over.
-		if (storeitem.userid != config.userid) {
-			// if we have drawn the list from online
-			// set the existing userid which is from the itemstore
-			// into the userinstance field for future code updates.
-			if (online) {
-				if (online && storeitem.userinstance.indexOf(storeitem.userid) == -1) {
-					storeitem.userinstance.push(storeitem.userid);
-					storeitem.userid = config.userid;
-					writeStored();
-				}
-			} else {
-				// this is the new way.
-				// if the item has been updated as it should have
-				// because there is a possibility it could be shared across multiple accounts
-				// this indicates google is hashing images if they are deemed duplicates
-				// creating ids that exist between different accounts
-				// that indicates the possibility of media duplicate detection
-				// should later generate a list of items to delete.
-				if (config.userinstance.indexOf(storeitem.userid) == -1) {
-					console.log('Item is from different user account');
-					continue;
-				}
-			}
-		}
+		// if (storeitem.userid != config.userid) {
+		// 	// if we have drawn the list from online
+		// 	// set the existing userid which is from the itemstore
+		// 	// into the userinstance field for future code updates.
+		// 	if (online) {
+		// 		if (online && storeitem.userinstance.indexOf(storeitem.userid) == -1) {
+		// 			storeitem.userinstance.push(storeitem.userid);
+		// 			storeitem.userid = config.userid;
+		// 			writeStored();
+		// 		}
+		// 	} else {
+		// 		// this is the new way.
+		// 		// if the item has been updated as it should have
+		// 		// because there is a possibility it could be shared across multiple accounts
+		// 		// this indicates google is hashing images if they are deemed duplicates
+		// 		// creating ids that exist between different accounts
+		// 		// that indicates the possibility of media duplicate detection
+		// 		// should later generate a list of items to delete.
+		// 		if (config.userinstance.indexOf(storeitem.userid) == -1) {
+		// 			console.log('Item is from different user account');
+		// 			continue;
+		// 		}
+		// 	}
+		// }
 
 		// download headers have not been pulled back if expected size is -1
 		if (!storeitem.size || storeitem.size == -1) {
@@ -311,11 +319,10 @@ app.post('/redownloadstart', async (req, res) => {
 				processedstats.missinglocal++;
 				writeStored();
 			}
-
-			if (!storeitem.finished) pushtoQueue(destfilename, storeitem, config.atoken.access_token);
+			
+			if (!storeitem.finished) pushtoQueue(destfilename, storeitem);
 		}
 		
-		i++;
 	}
 
 
@@ -380,6 +387,47 @@ app.get('/albums', async (req, res) => {
 		res.redirect('/auth/google');
 	}
 });
+
+
+// app.get('/userinstance', async(req,res) =>
+// {
+// 	// i am suspecting that some store corruption occurred but i want to be sure.
+// 	// it woudl reduce the size of the store a bit if I could find
+// 	// that the reason items were not unqiue is because they showed up
+// 	// due to a code error.
+// 	if (pairs)
+// 	{
+// 		var baduserinstance = 0;
+
+// 		for (var i in stored )
+// 		{
+// 			var storeitem = stored[i];
+
+// 			var f = keytree.findInTree( queuetree, storeitem.id);
+			
+// 			if (storeitem.userinstance.indexOf(config.userid) > -1)
+// 			{
+// 				if (!f.found)
+// 				{
+					
+// 					storeitem.userinstance = lodash.remove(
+// 					function (u)
+// 					{
+// 						return u != config.userid;
+// 					}
+// 					);
+
+// 					baduserinstance++;
+// 				}
+// 			}
+
+// 		}
+
+// 		console.log("there were "+baduserinstance+' bad user instances');
+// 		writeStored();
+// 	}
+
+// });
 
 app.get(
 	'/auth/google/callback',
@@ -897,9 +945,9 @@ function loadandsortStored() {
 		var keypath = [];
 		var item = stored[i];
 
-		if (!item.userinstance) {
-			item.userinstance = [];
-		}
+		// if (!item.userinstance) {
+		// 	item.userinstance = [];
+		// }
 
 		var kti = keytree.addToTree(storetree, item.id, item);
 		processedstats.storetreeadd+=kti.time;
@@ -985,34 +1033,34 @@ async function getpairedlist(online, paths) {
 				// if online flag is set all the items in the list are matched against online items
 				// therefore update the store items userinstance and userids
 				if (sta.userid != config.userid) {
-					if (sta.userinstance.indexOf(sta.userid) == -1) {
-						sta.userinstance.push(sta.userid);
-					}
+					// if (sta.userinstance.indexOf(sta.userid) == -1) {
+					// 	sta.userinstance.push(sta.userid);
+					// }
 
 					sta.userid = config.userid;
 					updated = true;
 				}
 
-				if (sta.userinstance.indexOf(config.userid) == -1) {
-					sta.userinstance.push(config.userid);
-					updated = true;
-				}
+				// if (sta.userinstance.indexOf(config.userid) == -1) {
+				// 	sta.userinstance.push(config.userid);
+				// 	updated = true;
+				// }
 
 				sta.userid = config.userid;
 
 				if (stb.userid != config.userid) {
-					if (stb.userinstance.indexOf(stb.userid) == -1) {
-						stb.userinstance.push(stb.userid);
-					}
+					// if (stb.userinstance.indexOf(stb.userid) == -1) {
+					// 	stb.userinstance.push(stb.userid);
+					// }
 
 					stb.userid = config.userid;
 					updated = true;
 				}
 
-				if (stb.userinstance.indexOf(config.userid) == -1) {
-					stb.userinstance.push(config.userid);
-					updated = true;
-				}
+				// if (stb.userinstance.indexOf(config.userid) == -1) {
+				// 	stb.userinstance.push(config.userid);
+				// 	updated = true;
+				// }
 
 			//	writeStored();
 			}
@@ -1089,6 +1137,17 @@ async function getpairedlist(online, paths) {
 				}
 			}
 		});
+	}
+
+
+	queuetree = {};
+
+	if (online)
+	{
+		for (var i in result)
+		{
+			keytree.addToTree(queuetree, result[i].id);
+		}
 	}
 
 	writeStored();

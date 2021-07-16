@@ -3,6 +3,7 @@ const fs = require('fs');
 const { create } = require('node:domain');
 const { stringify } = require('node:querystring');
 const path = require('path');
+const lodash = require('lodash')
 
 function createLevel(level, parent) {
 	level.categories = {};
@@ -83,6 +84,27 @@ function addToTree(tree, key,  tag, index=0, keypath = null) {
 	}
 }
 
+
+function removeFromTree(tree, key)
+{
+	var f = findInTree(tree,key);
+
+	if (f.found)
+	{
+		var treeptr = tree;
+
+		for (var i  in f.keypath )
+		{
+			var treeptr = treeptr.categories[f.keypath[i]];
+		}
+
+		treeptr.keys = lodash.remove( treeptr.keys, function(t)
+		{
+		   return t.key = key;
+		});
+	}
+}
+
 function findInTree(tree, key, index=0, keypath=null) {
 	var begindate = Date.now();
 	var tt = 0;
@@ -146,7 +168,8 @@ function findInTree(tree, key, index=0, keypath=null) {
 var keytree = 
 {
 	addToTree:addToTree,
-    findInTree:findInTree
+    findInTree:findInTree,
+	removeFromTree:removeFromTree
 }
 
 
