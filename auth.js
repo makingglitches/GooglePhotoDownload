@@ -23,6 +23,7 @@ function authdone(atoken,rtoken, profile)
   console.log("Profile: "+profile);
   fs.writeFileSync('rtoken.txt',rtoken);
   config.atoken = {expires_in:30*60, access_token:atoken, expiretime : Date.now()+30*60*1000};
+  config.startService();
 }
 
 const GoogleOAuthStrategy = require('passport-google-oauth20').Strategy;

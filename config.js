@@ -24,7 +24,7 @@ const config = {};
 
 config.refreshHandle=-1;
 
-config.atoken ={};
+config.atoken =null;
 
 // The OAuth client ID from the Google Developers console.
 config.oAuthClientID = obj.installed.client_id;

@@ -19,8 +19,13 @@ const querystring = require('querystring');
 const lodash = require('lodash');
 const mime = require('mime-types');
 const keytree = require('./bintree/keytree');
+const sizeof=require('object-sizeof');
+const items = require('./storemgr/itemstore');
+const sql = require('sqlite3').verbose();
 
 const nodownload = false;
+
+config.startService = refreshtimerrestart;
 
 var storetree = {};
 
@@ -91,6 +96,7 @@ const { json } = require('express');
 const { WSAENOTSOCK } = require('constants');
 const { exception } = require('console');
 const { CONNREFUSED } = require('dns');
+const { debounce } = require('lodash');
 
 
 
@@ -137,7 +143,7 @@ app.use((req, res, next) => {
 
 
 app.get('/', (req, res) => {
-	if (!req.user || !req.isAuthenticated()) {
+	if (!req.user || !req.isAuthenticated() ) {
 		console.log('sending user to authenticate page.');
 		res.redirect('/auth/google');
 	} else {
@@ -279,6 +285,8 @@ app.post('/redownloadstart', async (req, res) => {
 				writeStored();
 			}
 			
+			 console.log(sizeof(waiting));
+
 			if (!storeitem.finished) pushtoQueue(destfilename, storeitem);
 		}
 		
@@ -348,21 +356,25 @@ app.get('/albums', async (req, res) => {
 });
 
 
+
 app.get(
 	'/auth/google/callback',
 	passport.authenticate('google', { failureRedirect: '/', failureFlash: true, session: true }),
 	(req, res) => {
 		// User has logged in.
-		console.log('User has logged in.');
 
-		refreshtimerrestart();
+		
+			console.log('User has logged in.');
 
-		config.userid = req.user.profile.id;
-
-		loadUserStore();
-		loadandsortStored();
-
-		res.redirect('/');
+			// moved this to be called by authenbticate callback.
+		//	refreshtimerrestart();
+		
+			config.userid = req.user.profile.id;
+		
+			loadUserStore();
+			loadandsortStored();
+		
+			res.redirect('/');
 	}
 );
 
@@ -387,6 +399,9 @@ function processPairedList() {
 
 	loadandsortStored();
 
+	var db = new sql.Database("ItemStore.sqlite");
+
+
 	/*
 	var itemnames = pairs.gitems.map(function(v) {
 		return v.filename;
@@ -401,14 +416,21 @@ function processPairedList() {
 	console.log('Comparing.');
 
 	for (var i in pairs.localfiles) {
-		var f = itemnames.indexOf(path.basename(pairs.localfiles[i].toString()));
+	//	var f = itemnames.indexOf(path.basename(pairs.localfiles[i].toString()));
 
-		if (f > -1) {
+		//if (f > -1) {
+
+		var exists =  items.FileInStore(db, pairs.localfiles[i]);
+
+		if (exists)
+		{
 			onserver.push(pairs.localfiles[i].toString());
 		} else {
 			localonly.push(pairs.localfiles[i].toString());
 		}
 	}
+
+	db.close();
 
 	pairs.onserver = onserver;
 	pairs.localonly = localonly;
@@ -476,16 +498,22 @@ async function refreshStoredUrl(storeitem) {
 	var result = await getitem(storeitem.id);
 
 	if (!result) {
+
+		var db = OpenDatabase();
+
+		items.MarkMissingOnline(db,storeitem.id, true);
+		items.MarkFinished(db,storeitem.id, true);
+
 		// didn't find this online.
 		storeitem.online = false;
-		// item is missing from online.
-		storeitem.missingonline = true;
 
 		storeitem.finished = true;
 
 		fs.appendFileSync('missingids.txt', storeitem.userid + '\n' + storeitem.filename + '\n' + storeitem.id + '\n');
 
 		processedstats.missingonline++;
+
+		db.close();
 
 		return null;
 	}
@@ -499,8 +527,13 @@ async function refreshStoredUrl(storeitem) {
 		result = refreshStoredUrl(storeitem);
 		return result.baseUrl;
 	} else {
+
 		storeitem.voption = result.mediaMetadata.video ? 'v' : '';
 
+		var db = OpenDatabase();
+		items.SetVOption(db, storeitem.id, storeitem.voption);
+		db.close();
+		
 		writeStored();
 
 		console.log('Updated URL');
@@ -509,15 +542,31 @@ async function refreshStoredUrl(storeitem) {
 	}
 }
 
+function OpenDatabase()
+{
+	var db = new sql.Database('ItemStore.sqlite');
+	return db;
+}
+
 async function startJob(destfilename, storeitem) {
+
+
+	var db = OpenDatabase();
+
 	var url = await refreshStoredUrl(storeitem);
 
 	if (!url) {
 		console.log(storeitem.filename);
 		console.log('JOB Canceled. Item is missing from online.');
+
+		items.MarkMissingOnline(db, storeitem.id, true );
+		items.MarkFinished(db, storeitem.id, true);
+
 		storeitem.finished = true;
 		storeitem.missingonline = true;
 		writeStored();
+
+		db.close();
 		return null;
 	}
 
@@ -527,6 +576,10 @@ async function startJob(destfilename, storeitem) {
 		console.log(' PIPE FINISHED !: ' + this.filename);
 
 		if (!storeitem.error) {
+
+			
+			var db = OpenDatabase();
+
 			var size = fs.statSync(this.destination);
 
 			processedstats.finished++;
@@ -534,6 +587,12 @@ async function startJob(destfilename, storeitem) {
 			this.storeitem.finished = true;
 			this.storeitem.finishedsize = size.size;
 			console.log('finished size: ' + this.storeitem.finishedsize);
+
+			items.MarkFinished(db,storeitem.id, true );
+			items.SetFinishedSize(db,storeitem.id, size.size);
+
+			db.close();
+
 		} else {
 			console.log('Request promise sent error.');
 		}
@@ -568,6 +627,9 @@ async function startJob(destfilename, storeitem) {
 		}
 
 		if (pipeindex > -1) {
+
+			var db = OpenDatabase();
+
 			var p = pipes[pipeindex];
 
 			p.close();
@@ -581,6 +643,10 @@ async function startJob(destfilename, storeitem) {
 
 			p.storeitem.finished = false;
 			p.storeitem.error = true;
+
+			items.MarkFinished(db, p.storeitem.id, false);
+
+			db.close();
 		}
 
 		pushtoQueue(this.destination, this.storeitem);
@@ -1063,17 +1129,21 @@ async function listItems() {
 	for (var i in matches) {
 		var found = false;
 
+	
+
 		var found = keytree.findInTree(storetree, matches[i].id);
 
 		if (found.found) {
 			found.obj.tag.userid = config.userid;
+			found.obj.tag.mediadata = matches[i].mediaMetadata;
 		} else {
 			var newitem = {
 				id: matches[i].id,
 				filename: matches[i].filename,
 				size: -1,
 				finished: false,
-				userid: config.userid
+				userid: config.userid,
+				mediadata: matches[i].mediaMetadata
 			};
 
 			stored.push(newitem);
@@ -1081,6 +1151,11 @@ async function listItems() {
 			var kti = keytree.addToTree(storetree, newitem.id, newitem);
 			processedstats.storetreeadd+=kti.time;
 		}
+
+		delete matches[i].mediaMetadata;
+		delete matches[i].mimeType;
+		delete matches[i].productURL;
+		delete matches[i].baseUrl;
 	}
 
 	writeStored();

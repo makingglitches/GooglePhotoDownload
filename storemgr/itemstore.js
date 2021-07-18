@@ -79,8 +79,42 @@ async function SetVOption(db, id, voption) {
 	return r.success;
 }
 
+async function FileInStore(db, filename, userid=null)
+{
 
 
+	var sql = 'select 1 from storeitem where filenameonserver=? '
+	var params = [filename];
+	
+	if (userid)
+	{
+		params.push(userid);
+		sql += (userid!=null ? ' and userid=?': "");
+	}
+	
+	var r = await getrows(db,sql,params);
+
+	if (r.success)
+	{
+		if (r.rows.length > 0)
+		{
+			return true;
+		}
+		else
+		{
+			return false;
+		}
+	}
+
+	throw r.err;
+}
+
+
+async function MarkMissingOnline(db, id, missing)
+{
+	var r = await getrows(db,'update StoreItem set Online=? where id=?', [!missing,id]);
+	return r.success;
+}
 
 async function AddStoreItem(db, id, filename, userid) {
 	var r = await 
@@ -120,10 +154,6 @@ async function UpdateSize(db, id, size) {
 	return r.success;
 }
 
-async function markOnline(db, id, online) {
-	var r = await getrows(db, 'update storeitem set online = ? where id = ?', [ online, id ]);
-	return r.success;
-}
 
 async function CheckExists(db, id) {
 	var r = await getrows(db, 'select 1 from StoreItem where id=?', id);
@@ -169,12 +199,24 @@ async function GetUnfinishedItems(db, userid=null, offset=null, limit=null)
 }
 
 
+async function SetFinishedSize(db, id, size)
+{
+	var r = await getrows(db, 'update storeitem set finishedsize=? where id=?', [size,id]);
+	return r.success;
+}
+
+async function MarkWaitTillNext(db,id, val)
+{
+	var r = await getrows(db, 'update storeitem set waittillnext=? where id=?',[val,id]);
+
+	return r.success;
+}
+
 module.exports = {
 	CheckExists: CheckExists,
 	MarkFinished: MarkFinished,
 	UpdateSize: UpdateSize,
 	MarkMissingLocal: MarkMissingLocal,
-	markOnline: markOnline,
 	AddStoreItem: AddStoreItem,
 	SetVOption: SetVOption,
 	GetIds: GetIds,
@@ -183,5 +225,9 @@ module.exports = {
     queryResult:queryResult,
     GetItems: GetItems,
     GetUnfinishedItems: GetUnfinishedItems,
-    getrows:getrows
+    getrows:getrows,
+	FileInStore:FileInStore,
+	MarkMissingOnline:MarkMissingOnline,
+	SetFinishedSize:SetFinishedSize,
+	MarkWaitTillNext:MarkWaitTillNext
 };

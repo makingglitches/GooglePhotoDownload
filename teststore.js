@@ -22,6 +22,9 @@ async function main() {
     await items.UpdateSize(db,key,22222);
     var item = await items.GetById(db,key);
 
+
+    var ya = await items.FileInStore(db,'1.png');
+
     var itemsr = await items.GetItems(db, null,10,11);
     var unfitems = await items.GetUnfinishedItems(db,null,10,11);
 
