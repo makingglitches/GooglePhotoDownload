@@ -83,7 +83,7 @@ async function FileInStore(db, filename, userid=null)
 {
 
 
-	var sql = 'select 1 from storeitem where filenameonserver=? '
+	var sql = 'select id from storeitem where filenameonserver=? '
 	var params = [filename];
 	
 	if (userid)
@@ -98,11 +98,11 @@ async function FileInStore(db, filename, userid=null)
 	{
 		if (r.rows.length > 0)
 		{
-			return true;
+			return {res: true, id: r.rows[0]};
 		}
 		else
 		{
-			return false;
+			return {res: false, id: -1};
 		}
 	}
 
@@ -144,8 +144,8 @@ async function MarkMissingLocal(db, id, val) {
 }
 
 
-async function UpdateOriginalSize(db, id, size) {
-	var r = await getrows(db, 'update storeitem set originalsize = ? where id = ?', [ size, id ]);
+async function UpdateOriginalSizeIf(db, id, size) {
+	var r = await getrows(db, 'update storeitem set originalsize = ? where id = ? and originalsize is null', [ size, id ]);
 	return r.success;
 }
 
@@ -212,6 +212,15 @@ async function MarkWaitTillNext(db,id, val)
 	return r.success;
 }
 
+async function CleatAllWaitTillNext(db,id)
+{
+	var r = await getrows(db, 'update storeitem set waittillnext=? ',[val]);
+
+	return r.success;
+}
+
+
+
 module.exports = {
 	CheckExists: CheckExists,
 	MarkFinished: MarkFinished,
@@ -229,5 +238,7 @@ module.exports = {
 	FileInStore:FileInStore,
 	MarkMissingOnline:MarkMissingOnline,
 	SetFinishedSize:SetFinishedSize,
-	MarkWaitTillNext:MarkWaitTillNext
+	MarkWaitTillNext:MarkWaitTillNext,
+	CleatAllWaitTillNext:CleatAllWaitTillNext,
+	UpdateOriginalSizeIf: UpdateOriginalSizeIf
 };

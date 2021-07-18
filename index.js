@@ -942,6 +942,60 @@ function writeStored() {
 	fs.writeFileSync('itemstore.json', JSON.stringify(stored));
 }
 
+
+//TODO: pull the sort code out and do direct db checks 
+// IF the filename exists, mark it accordingly
+// IF the original size is not set, set it in teh database
+// dispose of the items pulled from the server afterwards
+// do the item moves
+
+
+
+async function prepareQueue(online, paths)
+{
+
+	var files = [];
+
+	var db = OpenDatabase();
+
+	console.log('recursing local store');
+
+	// retrieve a list of local files.
+	for (var i in paths) {
+		files = files.concat(recursepath(paths[i]));
+	}
+
+	if (online) {
+		result = await listItems();
+	} 
+
+	items.CleatAllWaitTillNext(db);
+
+	var local = [];
+	var onserver = [];
+	
+	for (var i in files)
+	{
+		var r = items.FileInStore(db,files[i],config.userid);
+
+		if (r.res)
+		{
+			var s = fs.statSync(files[i]).size;
+
+			items.UpdateOriginalSizeIf(db,r.id,s);
+
+			local.push(files[i]);
+		}
+		else
+		{
+			onserver.push(files[i]);
+		}
+	}
+
+
+
+} 
+
 async function getpairedlist(online, paths) {
 	loadandsortStored();
 
@@ -998,14 +1052,23 @@ async function getpairedlist(online, paths) {
 		// sort the gitems array in pairs.
 		// if originals are on server already, to save disk space download these first.
 		// so they can be compared and deleted.
+
+		//var db = OpenDatabase();
+
 		result.sort(function(a, b) {
 			var resa = keytree.findInTree(storetree, a.id);
 			var sta = resa.obj.tag;
+
+		
 			
 			processedstats.storetreefind+=resa.time;
 
 			var resb =keytree.findInTree(storetree, b.id); 
 			var stb = resb.obj.tag;
+
+			// sqlite code.
+			
+			
 
 			processedstats.storetreefind+=resb.time;
 
@@ -1018,6 +1081,9 @@ async function getpairedlist(online, paths) {
 			// this is costly, if the files original size is not tracked but the file exists
 			// store this size for space savings comparison later.
 			if (contai.found) {
+
+
+
 				if (!sta.originalsize) {
 					var stat = fs.statSync(path.join(contai.obj.tag[0], contai.obj.key));
 					sizechange = sizechange || true;
