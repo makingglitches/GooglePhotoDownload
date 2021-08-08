@@ -21,7 +21,7 @@ var insstmt = `INSERT INTO StoreItem (
     SizeOnServer,
     FinishedSize,
     Finished,
-    vOption,
+    VideoOption,
     MissingLocal,
     Online,
     OriginalSize
@@ -70,7 +70,7 @@ for (var i in items)
         item.size, 
         item.finishedsize, 
         item.finished, 
-        item.voption,
+        item.VideoOption,
         item.missinglocal,
         item.online,
         item.originalsize];
