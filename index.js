@@ -35,19 +35,15 @@ var processedstats = {
 	userid: '',
 	missinglocal: 0,
 	missingonline: 0,
-	sizemismatch: 0,
-	finnotequaltosize: 0,
-	finnotequaltostat: 0,
+	notfinished: 0,
+	//	finnotequaltostat: 0,
 	finished: 0,
 	total: 0,
 	sizeretry: 0,
 	size: 0,
 	itemretry: 0,
 	item: 0,
-	wroteStored: 0,
-	loadedStored: 0,
-	storetreeadd: 0,
-	storetreefind: 0
+	mediaerror404: 0
 };
 
 //loadandsortStored();
@@ -100,6 +96,7 @@ const { exception } = require('console');
 const { CONNREFUSED } = require('dns');
 const { debounce } = require('lodash');
 const itemstore = require('./storemgr/itemstore');
+const { UpdateSize } = require('./storemgr/itemstore');
 
 itemstore.InitDB(OpenDatabase());
 
@@ -145,7 +142,7 @@ app.use((req, res, next) => {
 });
 
 app.get('/', (req, res) => {
-	if (!req.user || !req.isAuthenticated()) {
+	if (!checkauth()) {
 		console.log('sending user to authenticate page.');
 		res.redirect('/auth/google');
 	} else {
@@ -155,35 +152,41 @@ app.get('/', (req, res) => {
 	}
 });
 
-
 //TODO: UPDATE THIS TO USE SQLITE.
 app.post('/redownloadstart', async (req, res) => {
 	processedstats.userid = config.userid;
-	
+	var res1 = await CheckDownloads();
 	var totals = await MoveOriginalsUpdateStore();
+			// resolve the problem where original size is less than that on server but the original is missing
+		var res2 = await itemstore.resolveMissingLocalSizeandDownload(config.curraccount.userid);
+
 
 	endtimer = false;
-	
+
 	// kick off the queue timer.
 	// in redesign queue timer will begin querying the database for items to run.
 
 	timecall();
-	
 });
 
 app.get('/getlist', async (req, res) => {
-	if (checkauth(req)) {
+	if (checkauth()) {
 		// less than optimal is where it doesnt check length.
 		// unfortunately how can it without downloading every item if fucking google doesnt expose that field ?
 
 		var total = await FillInitialQueueFromServer();
+		var dls = await CheckDownloads();
 		var locals = await MoveOriginalsUpdateStore();
+		// resolve the problem where original size is less than that on server but the original is missing
+		var res2 = await itemstore.resolveMissingLocalSizeandDownload(config.curraccount.userid);
 
-		res.status(200).send({ message: 'completed', totals: total, local:locals });
+
+		res.status(200).send({ message: 'completed', totals: total, local: locals });
 
 		console.log('sent item info to client');
 	} else {
-		res.status(400).send('user not authenticated');
+		// user isn't authenticated. send to login.
+		res.redirect('/auth/google');
 	}
 });
 
@@ -256,8 +259,20 @@ function pushtoQueue(destfilename, storeitem) {
 	waiting.push({ filename: destfilename, item: storeitem });
 }
 
+
+async function CheckDownloads()
+{
+	// fuck them i did this before.
+	var files= recursepath(config.curraccount.destdir).map(function(v){ return path.basename(v)});
+
+	await itemstore.UpdateMissingDownloadsByNames(files,config.curraccount.userid);
+
+}
+
+
 //FINISHED
 async function MoveOriginalsUpdateStore() {
+
 	// get the files locally stored, and recurse through these paths finding all video files
 	var paths = [ config.curraccount.onserverdirectory, config.curraccount.localdirectory ];
 	var files = [];
@@ -269,8 +284,8 @@ async function MoveOriginalsUpdateStore() {
 		files = files.concat(recursepath(paths[i]));
 	}
 
-	var onservercount = 0
-	var localonlycount = 0
+	var onservercount = 0;
+	var localonlycount = 0;
 
 	// just in case we're processing a lot of files this offsets the performance hit to follow !
 	var serverfiletree = {};
@@ -284,6 +299,8 @@ async function MoveOriginalsUpdateStore() {
 
 	// get a list by filename from the itemstore
 	var items = await itemstore.CheckExistsFileByNames(itemnames, config.curraccount.userid);
+	// update the originalmissing field.
+	var res4 = await itemstore.UpdateMissingLocalByNames(itemnames, config.curraccount.userid);
 
 	for (var i in items) {
 		keytree.addToTree(serverfiletree, items[i].FileNameOnServer, items[i]);
@@ -292,52 +309,99 @@ async function MoveOriginalsUpdateStore() {
 	// empty results list
 	items = null;
 
-	var updatelist = [];
+	//	var updatelist = [];
 
 	for (var i in files) {
 		// decide what to do with local files in the processing directories
 
-		var found = keytree.findInTree(serverfiletree, files[i]);
+		var found = keytree.findInTree(serverfiletree, path.basename(files[i]));
 
 		if (found.Found) {
+			// get the basename of the file.
+			var bname = path.basename(files[i]);
+
+			// move item to the onserver directory
 			moveItems(files[i], config.curraccount.onserverdirectory);
 			onservercount++;
 
-			var stat = fs.statSync(path.join(config.curraccount.onserverdirectory, files[i]));
-			updatelist.push([ files[i], stat.size ]);
+			// update the file entry for the changed location
+			files[i] = path.join(config.curraccount.onserverdirectory, bname);
 
-			var localdl = path.join(config.curraccount.destdir, files[i]);
+			// get the original's size
+			var stat = fs.statSync(files[i]);
 
+			//		updatelist.push([ files[i], stat.size ]);
+
+			// the downloads filename.
+			var localdl = path.join(config.curraccount.destdir, bname);
+
+			// update the original size field if necessary
 			if (found.Obj.OriginalSize == null) {
 				itemstore.UpdateOriginalSizeIf(found.Obj.Id, stat.size);
+			}
+
+			var szupdated = false;
+
+			if (found.Obj.SizeOnServer == -1) {
+				szupdated= true;
+				var res = await updateSize(found.Obj, 5);
+				if (!res) {
+					console.log('Could not update size. Deletion could be accidental, skipping.');
+					continue;
+				}
 			}
 
 			if (fs.existsSync(localdl)) {
 				var statdl = fs.statSync(localdl);
 
-				if (statdl.size != found.Obj.SizeOnServer) {
-					fs.rmSync(localdl);
-					itemstore.MarkFinished(found.Obj.Id, false, 0);
+				if (statdl.size != found.Obj.SizeOnServer && !szupdated)
+				{
+						var res = await UpdateSize(found.Obj, 5);
+						if (!res) {
+							console.log('Could not update size. Deletion could be accidental, skipping.');
+							continue;
+						}
 				}
-			}
+				
+				// google occasionally reports values less than it should
+				// size wise and then these can be viewed and are of quality just the same.
+				if (statdl.size < found.Obj.SizeOnServer) {
+					fs.rmSync(localdl);
+					processedstats.notfinished++;
+					itemstore.MarkFinished(found.Obj.Id, false, 0, true);
+				} else {
+					itemstore.MarkFinished(found.Obj.Id, true, statdl.size, false);
+				}
+			} else {
+				processedstats.missinglocal++;
 
+				itemstore.MarkFinished(found.Obj.Id, false, 0, true);
+			}
 		} else {
 			moveItems(files[i], config.curraccount.localdirectory);
 			localonlycount++;
 		}
 	}
 
-	return {local:localonlycount, server:onservercount};
-}
+	console.log("LocalOnly: "+localonlycount+" OnServer: "+onservercount);
 
+	return { local: localonlycount, server: onservercount };
+}
 
 //FINISHED
 async function updateSize(storeitem, maxretries) {
 	processedstats.size++;
 
+	// we do this because this is a temporary url.
 	var url = await refreshStoredUrl(storeitem);
 
-	console.log("Found URL: "+url);
+	if (!url) {
+		console.log("Size Update Canceled, couldn't retrieve url.");
+		await itemstore.UpdateSize(storeitem.Id, -1);
+		return false;
+	}
+
+	console.log('Found URL: ' + url);
 
 	var retry = true;
 	var retries = 0;
@@ -350,7 +414,7 @@ async function updateSize(storeitem, maxretries) {
 		}
 
 		try {
-			var h = await request.head(url + '=d' + (storeitem.VideoOption? 'v':''), {}, (req, res) => {
+			var h = await request.head(url + '=d' + (storeitem.VideoOption ? 'v' : ''), {}, (req, res) => {
 				if (!res) {
 					// returns blank response it seems.
 					retry = true;
@@ -359,14 +423,17 @@ async function updateSize(storeitem, maxretries) {
 				} else {
 					// size update happens here.
 					storeitem.SizeOnServer = res.headers['content-length'];
-					itemstore.UpdateSize(storeitem.Id,storeitem.SizeOnServer);
 				}
 			});
 		} catch (err) {
-			console.log("Head request failed.");
+			console.log('Head request failed.');
 			retry = true;
 			retries++;
 			processedstats.sizeretry++;
+		}
+
+		if (!retry) {
+			await itemstore.UpdateSize(storeitem.Id, storeitem.SizeOnServer);
 		}
 	}
 
@@ -380,42 +447,17 @@ async function updateSize(storeitem, maxretries) {
 }
 
 //TODO: TEST THIS
-async function refreshStoredUrl(storeitem,maxretries=5,retried=0) {
-
-	var result = await getPhotoItem(storeitem.Id);
+async function refreshStoredUrl(storeitem) {
+	var result = await getPhotoItem(storeitem.Id, 5);
 
 	if (!result) {
-		//var db = OpenDatabase();
-
-		itemstore.MarkMissingOnline(storeitem.Id, true);
-		itemstore.MarkFinished(storeitem.Id, true);
-
-		// didn't find this online.
-		storeitem.online = false;
-		storeitem.Finished = true;
-
-		fs.appendFileSync('missingids.txt', storeitem.userid + '\n' + storeitem.FileNameOnServer + '\n' + storeitem.Id + '\n');
-
-		if (retried == maxretries)
-		{
-			processedstats.missingonline++;
-			return null;
-		}
-
-		retried++;
-
-		// apparently being super aggressive this way works.
-		// in short don't accept a failure just keep trying.
-		// this recurses until the result is found if its not found.
-		result = refreshStoredUrl(storeitem,maxretries,retried);
-
-		return result ?result.baseUrl:null;
-
+		console.log('Could not retrieve item url');
+		return null;
 	} else {
-		storeitem.VideoOption = result.mediaMetadata.video ? true: false;
+		storeitem.VideoOption = result.mediaMetadata.video ? true : false;
 
-		itemstore.SetVideoOption(storeitem.Id, storeitem.VideoOption);
-	
+		await itemstore.SetVideoOption(storeitem.Id, storeitem.VideoOption);
+
 		console.log('Updated URL');
 
 		return result.baseUrl;
@@ -438,8 +480,7 @@ async function startJob(destfilename, storeitem) {
 		console.log(storeitem.FileNameOnServer);
 		console.log('JOB Canceled. Item is missing from online.');
 
-		items.MarkMissingOnline(storeitem.Id, true);
-		items.MarkFinished(storeitem.Id, true);
+		await itemstore.MarkFinished(storeitem.Id, true);
 
 		storeitem.Finished = true;
 		storeitem.missingonline = true;
@@ -451,27 +492,24 @@ async function startJob(destfilename, storeitem) {
 
 	var ostream = fs.createWriteStream(destfilename);
 
-	ostream.on('finish', function() {
+	ostream.on('finish', async function() {
 		console.log(' PIPE FINISHED !: ' + this.filename);
 
 		if (!this.storeitem.error) {
-	
-
 			var size = fs.statSync(this.destination);
 
-			processedstats.Finished++;
+			processedstats.finished++;
 
 			this.storeitem.Finished = true;
 			this.storeitem.Finishedsize = size.size;
 
 			console.log('finished size: ' + this.storeitem.Finishedsize);
 
-			itemstore.MarkFinished(this.storeitem.Id, true);
-			itemstore.SetFinishedSize(this.storeitem.Id, size.size);
+			await itemstore.MarkFinished(this.storeitem.Id, true);
+			await itemstore.SetFinishedSize(this.storeitem.Id, size.size);
 
 			// clear from queue.
-			itemstore.MarkWaitTillNext(this.storeitem.Id,false);
-
+			await itemstore.MarkWaitTillNext(this.storeitem.Id, false);
 		} else {
 			console.log('Request promise sent error.');
 		}
@@ -486,9 +524,9 @@ async function startJob(destfilename, storeitem) {
 		console.log(err);
 	});
 
-	var req = request.get(url + '=d' + (storeitem.VideoOption? 'v':''));
+	var req = request.get(url + '=d' + (storeitem.VideoOption ? 'v' : ''));
 
-	req.on('error', function(err) {
+	req.on('error', async function(err) {
 		console.log('error with ' + this.filename);
 		console.log('placing job back in queue.');
 
@@ -521,7 +559,7 @@ async function startJob(destfilename, storeitem) {
 			p.storeitem.Finished = false;
 			p.storeitem.error = true;
 
-			items.MarkFinished(p.storeitem.Id, false);
+			await itemstore.MarkFinished(p.storeitem.Id, false);
 
 			///	db.close();
 		}
@@ -531,7 +569,7 @@ async function startJob(destfilename, storeitem) {
 
 	req.catch(function(err) {
 		var issue = err;
-		console.log("Default error handler for request reached.");
+		console.log('Default error handler for request reached.');
 	});
 
 	// this is still the request promise.
@@ -561,36 +599,27 @@ async function startJob(destfilename, storeitem) {
 // TODO: TEST THIS
 // this function starts the queue timer and starts jobs as queue slots become available.
 async function timecall() {
-
 	endtimer = true;
 	var googlegayasslimit = 4;
 	var started = 0;
 	var queueswap = [];
 
 	// try to grab another 100 items waiting.
-	if (waiting.length == 0)
-	{
+	if (waiting.length == 0) {
 		waiting = await itemstore.getNext100Waiting(config.curraccount.userid);
 
-		for (var i in waiting)
-		{
-			if (waiting[i].SizeOnServer == -1)
-			{
+		for (var i in waiting) {
+			if (waiting[i].SizeOnServer == -1) {
 				var res = await updateSize(waiting[i], 5);
 
-				if (!res)
-				{
-					console.log("removing item from queue, size update failed. attempt will reoccur later.");
-				}
-				else
-				{
+				if (!res) {
+					console.log('removing item from queue, size update failed. attempt will reoccur later.');
+				} else {
 					// if the size update was successful add to temp queue
 					// if not do not add, item will be picked up later from store
 					queueswap.push(waiting[i]);
 				}
-			}
-			else
-			{
+			} else {
 				// if size is defined, download is ready to go.
 				queueswap.push(waiting[i]);
 			}
@@ -598,19 +627,14 @@ async function timecall() {
 
 		// put the altered queue in place of the original waiting queue.
 		waiting = queueswap;
-
 	}
 
-	
-	
-
 	while (waiting.length > 0 && pipes.length < maxpipes) {
-
 		endtimer = false;
 		if (started == googlegayasslimit) break;
 
 		var i = waiting.shift();
-		var job = await startJob( path.join(config.curraccount.destdir,i.FileNameOnServer), i);
+		var job = await startJob(path.join(config.curraccount.destdir, i.FileNameOnServer), i);
 
 		if (!job) {
 			console.log('Job Canceled.');
@@ -619,7 +643,7 @@ async function timecall() {
 
 	var message = '';
 
-	var waitingcount = await items.getCountWaiting(config.curraccount.userid)
+	var waitingcount = await itemstore.getCountWaiting(config.curraccount.userid);
 
 	message += 'Active: ' + pipes.length + '  Waiting: ' + waitingcount + '\n';
 
@@ -658,7 +682,7 @@ async function timecall() {
 
 	console.log(message);
 
-	if ( waiting.length == 0 && pipes.length == 0) {
+	if (waiting.length == 0 && pipes.length == 0) {
 		console.log('stopping timer');
 	} else {
 		setTimeout(() => {
@@ -691,6 +715,7 @@ async function getPhotoItem(id, maxretries = 5) {
 	var retry = true;
 	var retries = 0;
 	processedstats.item++;
+	var result = null;
 
 	while (retry && retries < maxretries + 1) {
 		retry = false;
@@ -700,7 +725,7 @@ async function getPhotoItem(id, maxretries = 5) {
 		}
 
 		try {
-			var result = await request
+			result = await request
 				.get(config.apiEndpoint + '/v1/mediaItems/' + id, {
 					headers: { 'Content-Type': 'application/json' },
 					qs: {},
@@ -708,17 +733,30 @@ async function getPhotoItem(id, maxretries = 5) {
 					auth: { bearer: config.atoken.access_token }
 				})
 				.on('error', function(err) {
-					console.log('reached promise block error');
+					console.log('MediaItem OnError');
+					console.log(err.message);
 					retry = true;
 					retries++;
 				});
 		} catch (err) {
 			console.log('reached catch-block error');
+			console.log(err.message);
 
+			// these only happen when there is something wrong with google
+			// meaning the getlist returns the ids but the actual request returns nothing
+			// however often these end up downloading anyway with a null size.
+			// these sometimes tend to be encounetred also when google is undereporting the download size
+			// something eventually fixes these.
+			if (err.statusCode == 404) {
+				console.log('item not found !');
+				console.log(id);
+				processedstats.mediaerror404++;
+				await itemstore.setMediaErrorFlag(id, true);
+				return null;
+			}
 			if (err.statusCode == 400) {
 				console.log('media item not found !!');
 				console.log(id);
-				retry = false;
 				return null;
 			} else {
 				retry = true;
@@ -752,28 +790,24 @@ var stored = [];
 
 //finished
 function moveItems(file, dest) {
-	
-		var newname = path.join( dest , path.basename(file));
+	var newname = path.join(dest, path.basename(file));
 
-		if (file == newname) {
-			return;
-		}
+	if (file == newname) {
+		return;
+	}
 
-		fs.renameSync(file, newname);
-	
-		console.log('Moved ' + path.basename(file));
-	
+	fs.renameSync(file, newname);
+
+	console.log('Moved ' + path.basename(file));
 }
 
-
 // FINISHED
-function checkauth(req) {
-	return config.atoken.access_token;
+function checkauth() {
+	return config.atoken && config.atoken.access_token && config.atoken.expiretime > Date.now();
 }
 
 //FINISHED
 async function FillInitialQueueFromServer() {
-
 	var totalitemcount = 0;
 
 	var result = await request.get(config.apiEndpoint + '/v1/mediaItems', {
@@ -783,17 +817,16 @@ async function FillInitialQueueFromServer() {
 		auth: { bearer: config.atoken.access_token }
 	});
 
-	itemstore.deleteQueue();
+	await itemstore.deleteQueue();
 
 	var matches = [];
 
 	matches = matches.concat(result.mediaItems);
 
-	if (result && result.mediaItems)
-	{
-		itemstore.addqueueitems(result.mediaItems);
-		totalitemcount+=result.mediaItems.length;
-	}	
+	if (result && result.mediaItems) {
+		await itemstore.addqueueitems(result.mediaItems);
+		totalitemcount += result.mediaItems.length;
+	}
 
 	while (result && result.nextPageToken && !fasttest) {
 		console.log('requesting another 100 items.');
@@ -811,28 +844,28 @@ async function FillInitialQueueFromServer() {
 
 		if (result && result.mediaItems) {
 			//	matches = matches.concat(result.mediaItems);
-			itemstore.addqueueitems(result.mediaItems);
-			totalitemcount+=result.mediaItems.length;
+			await itemstore.addqueueitems(result.mediaItems);
+			totalitemcount += result.mediaItems.length;
 		}
 	}
 
 	var totals = await itemstore.getNewItems(config.curraccount.userid);
 
-	if (totals > 0)
-	{
-		console.log("New Items found: "+totals);
+	if (totals > 0) {
+		console.log('New Items found: ' + totals);
 	}
 
-	var res =  await itemstore.setWaitTillNextFromQueue(config.curraccount.userid);
-
+	var res3 = await itemstore.setOnlineStatusFromQueue(config.curraccount.userid);
 
 	var res2 = await itemstore.createNewStoreItemsFromQueue(config.curraccount.userid);
 
+	var res = await itemstore.setWaitTillNextFromQueue(config.curraccount.userid);
 
-	console.log('Found '+totalitemcount+" Items.");
+	
+
+	console.log('Found ' + totalitemcount + ' Items.');
 	return totalitemcount;
 }
-
 
 //https://developers.google.com/identity/protocols/oauth2/web-server#httprest_1
 
@@ -854,7 +887,7 @@ async function refreshAccessToken() {
 
 	// this needs to be where we store the f-ing auth token, fuck passport past the initial crap
 	config.atoken = JSON.parse(result);
-	config.atoken.expiretime = Date.now() + atoken.expires_in * 1000;
+	config.atoken.expiretime = Date.now() + config.atoken.expires_in * 1000;
 
 	refreshtimerrestart();
 

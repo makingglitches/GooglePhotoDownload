@@ -114,12 +114,6 @@ async function FileInStore(filename, userid=null)
 }
 
 
-async function MarkMissingOnline( id, missing)
-{
-	var r = await getrows(db,'update StoreItem set Online=? where id=?', [!missing,id]);
-	return r.success;
-}
-
 async function AddStoreItem( id, filename, userid) {
 	var r = await 
     getrows(db, 'insert into StoreItem(id,filenameonserver,userid) values (?, ?, ?)', [
@@ -131,11 +125,11 @@ async function AddStoreItem( id, filename, userid) {
 	return r.success;
 }
 
-async function MarkFinished( id, finished, finishedsize, missinglocal=false) {
+async function MarkFinished( id, finished, finishedsize, downloadmissinglocal=false) {
 	var r = await getrows(db, 'update StoreItem set finished= ?,  finishedsize= ?, downloadmissinglocal=? where id =? ', [
 		finished,
 		finishedsize,
-		missinglocal,
+		downloadmissinglocal,
 		id
 	]);
 
@@ -243,10 +237,45 @@ async function GetItemsByIds(idarray)
 async function CheckExistsFileByNames(namesarray,userid)
 {
 	prepare = namesarray.map(function(v) { return "'"+v+"'"}).join();
+	prepare = '('+prepare+')'
 
-	var r = await getrows(db, 'select * from storeitem where filenameonserver in (?) and userid=?',[prepare,userid]);
+	// i don't know why i have to do it this way
+	// TODO: CHECK IF I CAN JUST SEND AN ARRAY IN, WHICH I DON'T THINK I CAN ACTUALLY.
+	var r = await getrows(db, 'select * from storeitem where filenameonserver in '+prepare+ ' and userid=? and mediaitemerror404=0 ',[userid]);
 
 	return r.success ? r.rows: null;
+}
+
+async function UpdateMissingLocalByNames(namesarray,userid)
+{
+	prepare = namesarray.map(function(v) { return "'"+v+"'"}).join();
+	prepare = '('+prepare+')'
+
+	var sql = `update storeitem
+			   set originalmissinglocal = not storeitem.filenameonserver in  `+prepare+`
+			   where userid=?`;
+
+	// i don't know why i have to do it this way
+	// TODO: CHECK IF I CAN JUST SEND AN ARRAY IN, WHICH I DON'T THINK I CAN ACTUALLY.
+	var r = await getrows(db, sql,[userid]);
+
+	return r.success;
+}
+
+async function UpdateMissingDownloadsByNames(namesarray,userid)
+{
+	prepare = namesarray.map(function(v) { return "'"+v+"'"}).join();
+	prepare = '('+prepare+')'
+
+	var sql = `update storeitem
+			   set DownloadMissingLocal = not storeitem.filenameonserver in  `+prepare+`
+			   where userid=?`;
+
+	// i don't know why i have to do it this way
+	// TODO: CHECK IF I CAN JUST SEND AN ARRAY IN, WHICH I DON'T THINK I CAN ACTUALLY.
+	var r = await getrows(db, sql,[userid]);
+
+	return r.success;
 }
 
 async function deleteQueue()
@@ -291,10 +320,10 @@ async function setWaitTillNextFromQueue(userid)
 	suc = await ClearAllWaitTillNext(userid);
 
 	sql = `update storeitem  
-	set waittillnext = not storeitem.finished
+	set waittillnext = (not storeitem.finished) and (storeitem.sizeonserver==-1 or storeitem.originalsize is null or  storeitem.originalsize=0 or  storeitem.originalsize > storeitem.sizeonserver)
 	from queuestore q
 	where q.id = storeitem.id
-	and storeitem.userid=?`;
+	and storeitem.userid=? and storeitem.MediaItemError404=0`;
 
 	var stmt = db.prepare(sql,[userid]);
 
@@ -305,11 +334,24 @@ async function setWaitTillNextFromQueue(userid)
 
 async function getNext100Waiting(userid)
 {
-	sql = "select * from StoreItem where WaitTillNext=1 and userid=? limit 100"
+	sql = "select * from StoreItem where WaitTillNext=1 and userid=? and MediaItemError404=0 limit 100"
 
 	var res = await getrows(db,sql, [userid]);
 
 	return res.success ? res.rows : null;
+}
+
+
+async function setOnlineStatusFromQueue(userid)
+{
+	// i wish their dumbass syntax allowed something other than 2 subqueries.
+	var sql = `update storeitem
+				set online = exists(select null from Queuestore q where q.id=storeitem.id),
+				finished =  (storeitem.mediaitemerror404=1) or storeitem.finished or (not exists (select null from QueueStore q where q.id=storeitem.id))
+				where userid=?`
+
+	var res = await getrows(db,sql,[userid]);
+	return res.success;
 }
 
 async function createNewStoreItemsFromQueue(userid)
@@ -333,16 +375,32 @@ async function getCountWaiting(userid)
 
 }
 
+async function setMediaErrorFlag(id, status)
+{
+	var res = await getrows(db,"update storeitem set MediaItemError404=?, waittillnext=0 where id=?", [status,id]);
+	return res.success;
+}
+
+// this sets the queuestatus to 1 if the original has gone missing.
+async function resolveMissingLocalSizeandDownload(userid)
+{
+	var sql = `update StoreItem
+				set WaitTillNext =  (originalmissinglocal=1 and downloadmissinglocal=1) or (downloadmissinglocal=1 and originalsize > sizeonserver),
+				    Finished = not  ((originalmissinglocal=1 and downloadmissinglocal=1) or (downloadmissinglocal=1 and originalsize > sizeonserver))
+				where userid=? and mediaitemerror404=0`;
+
+	var res = getrows(db, sql, [userid]);
+
+	return res.success;
+}
+
+
 
 module.exports = {
 	InitDB: InitDB,
-	CheckExists: CheckExists,
 	MarkFinished: MarkFinished,
 	UpdateSize: UpdateSize,
-	MarkMissingLocal: MarkMissingLocal,
-	AddStoreItem: AddStoreItem,
 	SetVideoOption: SetVideoOption,
-	GetIds: GetIds,
 	getItemCount: getItemCount,
 	GetById:GetById,
     queryResult:queryResult,
@@ -350,7 +408,6 @@ module.exports = {
     GetUnfinishedItems: GetUnfinishedItems,
     getrows:getrows,
 	FileInStore:FileInStore,
-	MarkMissingOnline:MarkMissingOnline,
 	SetFinishedSize:SetFinishedSize,
 	MarkWaitTillNext:MarkWaitTillNext,
 	ClearAllWaitTillNext:ClearAllWaitTillNext,
@@ -363,5 +420,10 @@ module.exports = {
 	setWaitTillNextFromQueue:setWaitTillNextFromQueue,
 	getNext100Waiting: getNext100Waiting,
 	createNewStoreItemsFromQueue:createNewStoreItemsFromQueue,
-	getCountWaiting:getCountWaiting
+	getCountWaiting:getCountWaiting,
+	setMediaErrorFlag:setMediaErrorFlag,
+	setOnlineStatusFromQueue:setOnlineStatusFromQueue,
+	UpdateMissingLocalByNames:UpdateMissingLocalByNames,
+	UpdateMissingDownloadsByNames: UpdateMissingDownloadsByNames,
+	resolveMissingLocalSizeandDownload:resolveMissingLocalSizeandDownload
 };
