@@ -859,16 +859,6 @@ var waiting = [];
 
 var endtimer = false;
 
-// will limit the number of items from a server refresh to 100
-const fasttest = false;
-const localdir = '/Data/Desktop/Combined Photos etc/mp4locals';
-//'C:\\Users\\John\\Desktop\\Combined Photos etc\\mp4locals';
-const onserverdir = '/Data/Desktop/Combined Photos etc/mp4sonserver';
-//'C:\\Users\\John\\Desktop\\Combined Photos etc\\mp4sonserver';
-const othersourcedir = '';
-const pulldir = '/Data/Desktop/Combined Photos etc/techguyalpha';
-//'C:\\Users\\John\\Desktop\\Combined Photos etc\\mp4spulled';
-
 var pairs = {};
 var stored = [];
 
@@ -912,7 +902,7 @@ async function FillInitialQueueFromServer() {
 		totalitemcount += result.mediaItems.length;
 	}
 
-	while (result && result.nextPageToken && !fasttest) {
+	while (result && result.nextPageToken && !config.fasttest) {
 		console.log('requesting another 100 items.');
 		result = await request
 			.get(config.apiEndpoint + '/v1/mediaItems', {
@@ -1014,13 +1004,15 @@ function createUser() {
 	if (config.userid) {
 		var userfound = findUser();
 
+		console.log("ADDED NEW USER TO ACCOUNTS ! UPDATE THE DIRECTORIES ACCORDINGLY AND RELOAD THIS PROGRAM !");
+
 		if (!userfound) {
 			var acc = {
 				userid: config.userid,
 				title: 'Google User',
-				localdirectory: localdir,
-				onserverdirectory: onserverdir,
-				destdir: pulldir
+				localdirectory: config.defaultlocaldir,
+				onserverdirectory: config.defaultonserverdir,
+				destdir: config.defaultpulldir
 			};
 
 			accounts.push(acc);

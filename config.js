@@ -21,6 +21,12 @@ var obj = JSON.parse( fs.readFileSync('client_id copy.json'));
 
 const config = {};
 
+config.fasttest = false;
+config.defaultlocaldir = '/Data/Desktop/Combined Photos etc/mp4locals';
+config.defaultonserverdir= '/Data/Desktop/Combined Photos etc/mp4sonserver';
+config.defaultpulldir='/Data/Desktop/Combined Photos etc/techguyalpha';
+
+
 
 config.refreshHandle=-1;
 
