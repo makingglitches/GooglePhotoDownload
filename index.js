@@ -94,7 +94,7 @@ const { json } = require('express');
 const { WSAENOTSOCK } = require('constants');
 const { exception } = require('console');
 const { CONNREFUSED } = require('dns');
-const { debounce } = require('lodash');
+const { debounce, size } = require('lodash');
 const itemstore = require('./storemgr/itemstore');
 const { UpdateSize } = require('./storemgr/itemstore');
 
@@ -345,7 +345,7 @@ async function MoveOriginalsUpdateStore() {
 			if (found.Obj.SizeOnServer == -1) {
 				szupdated= true;
 				var res = await updateSize(found.Obj, 5);
-				if (!res) {
+				if (!res.Success) {
 					console.log('Could not update size. Deletion could be accidental, skipping.');
 					continue;
 				}
@@ -356,8 +356,8 @@ async function MoveOriginalsUpdateStore() {
 
 				if (statdl.size != found.Obj.SizeOnServer && !szupdated)
 				{
-						var res = await UpdateSize(found.Obj, 5);
-						if (!res) {
+						var res = await updateSize(found.Obj, 5);
+						if (!res.Success) {
 							console.log('Could not update size. Deletion could be accidental, skipping.');
 							continue;
 						}
@@ -389,7 +389,13 @@ async function MoveOriginalsUpdateStore() {
 }
 
 //FINISHED
-async function updateSize(storeitem, maxretries) {
+async function updateSize(storeitem, maxretries=5) {
+
+	if (maxretries <=0 )
+	{
+		throw "Maxtries in updateSize CANNOT BE <=0 ! This will cause a fatal error.";
+	}
+
 	processedstats.size++;
 
 	// we do this because this is a temporary url.
@@ -398,7 +404,7 @@ async function updateSize(storeitem, maxretries) {
 	if (!url) {
 		console.log("Size Update Canceled, couldn't retrieve url.");
 		await itemstore.UpdateSize(storeitem.Id, -1);
-		return false;
+		return {Success:false, item:storeitem};
 	}
 
 	console.log('Found URL: ' + url);
@@ -439,10 +445,10 @@ async function updateSize(storeitem, maxretries) {
 
 	if (retries >= maxretries) {
 		console.log('Failed to Update Size.');
-		return false;
+		return {Success:false, item:storeitem};
 	} else {
 		console.log('Updated size.');
-		return true;
+		return {Success:true, item:storeitem};
 	}
 }
 
@@ -473,6 +479,20 @@ function OpenDatabase() {
 //TODO: TEST THIS
 async function startJob(destfilename, storeitem) {
 	//	var db = OpenDatabase();
+
+	if (fs.existsSync(destfilename))
+	{
+		var stat = fs.statSync(destfilename)
+		{
+			if (storeitem.SizeOnServer <= stat.size)
+			{
+				console.log("Check file: "+storeitem.FileNameOnServer);
+				console.log("Had no size defined ahead of download call, but file exists and is larger to or equal to size on server.");
+				return null;
+			}
+		}
+
+	}
 
 	var url = await refreshStoredUrl(storeitem);
 
@@ -596,6 +616,70 @@ async function startJob(destfilename, storeitem) {
 	return ostream;
 }
 
+var sizequeue=[];
+var sizerunning = false;
+
+async function sizecall(overide=false)
+{
+	if (sizerunning && !overide)
+	{
+		// like a fork. sort of. if true this method should already be running or waiting for a timer call.
+		// override should only be set from inside this call.
+		return;
+	}
+
+	sizerunning = true;
+	var queueswap = [];
+
+	while (sizequeue.length > 0)
+	{
+		var item = sizequeue.shift();
+
+		// we should never encounter this if either the updatesize is not running or we already have a size.
+		// so add back into queue and/or start the updatesize job.
+		if (item.SizeOnServer == -1)
+		{
+			queueswap.push(item);
+		
+			if (!item.running)
+			{			
+				item.running = true;
+
+				updateSize(item).then( (v)=>
+				{
+					if (v.Success)
+					{
+						console.log("Adding item to waiting download queue. Size Updated.");
+						console.log(v.item.SizeOnServer);
+						waiting.push(v.item);
+					}
+					else
+					{
+						console.log("Update size failed. Leaving out of queue. ")
+					}
+				}).catch((err)=>
+				{
+					console.log("updateSize failed: "+err);
+				});
+			}
+		}
+	}
+
+	sizequeue = queueswap;
+
+	if (sizequeue.length > 0)
+	{
+		// continue processing.
+		setTimeout(() => {
+			sizecall(true);	
+		}, 5000);
+	}
+	else
+	{
+		sizerunning = false;
+	}
+}
+
 // TODO: TEST THIS
 // this function starts the queue timer and starts jobs as queue slots become available.
 async function timecall() {
@@ -605,21 +689,18 @@ async function timecall() {
 	var queueswap = [];
 
 	// try to grab another 100 items waiting.
-	if (waiting.length == 0) {
+	if (waiting.length + sizequeue.length == 0) {
 		waiting = await itemstore.getNext100Waiting(config.curraccount.userid);
 
 		for (var i in waiting) {
-			if (waiting[i].SizeOnServer == -1) {
-				var res = await updateSize(waiting[i], 5);
 
-				if (!res) {
-					console.log('removing item from queue, size update failed. attempt will reoccur later.');
-				} else {
-					// if the size update was successful add to temp queue
-					// if not do not add, item will be picked up later from store
-					queueswap.push(waiting[i]);
-				}
-			} else {
+			if (waiting[i].SizeOnServer == -1) {
+
+				sizequeue.push(waiting[i]);
+				sizecall();	
+			} 
+			else 
+			{
 				// if size is defined, download is ready to go.
 				queueswap.push(waiting[i]);
 			}
@@ -644,8 +725,11 @@ async function timecall() {
 	var message = '';
 
 	var waitingcount = await itemstore.getCountWaiting(config.curraccount.userid);
+	var inmemqueue = waiting.length;
+	var inmemsize = sizequeue.length;
 
-	message += 'Active: ' + pipes.length + '  Waiting: ' + waitingcount + '\n';
+	message += 'Active Pipes: ' + pipes.length + '  In DB Waiting: ' + waitingcount + '\n';
+	message += 'Waiting in Mem: '+inmemqueue+"  Size Queue Size: "+inmemsize+'\n';
 
 	for (var i in pipes) {
 		var rate = 0;
@@ -682,7 +766,7 @@ async function timecall() {
 
 	console.log(message);
 
-	if (waiting.length == 0 && pipes.length == 0) {
+	if (waiting.length == 0 && pipes.length == 0 && sizequeue.length ==0) {
 		console.log('stopping timer');
 	} else {
 		setTimeout(() => {
