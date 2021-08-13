@@ -43,7 +43,8 @@ var processedstats = {
 	size: 0,
 	itemretry: 0,
 	item: 0,
-	mediaerror404: 0
+	mediaerror404: 0,
+	skipped:0
 };
 
 //loadandsortStored();
@@ -432,10 +433,20 @@ async function updateSize(storeitem, maxretries=5) {
 				}
 			});
 		} catch (err) {
-			console.log('Head request failed.');
-			retry = true;
-			retries++;
-			processedstats.sizeretry++;
+
+			if (err.statusCode==500)
+			{
+				console.log("Head request failed with error 500, excluding from this session.");
+				await itemstore.MarkWaitTillNext(storeitem.Id, false);
+				return {Success:false, item:storeitem};
+			}
+			else
+			{
+				console.log('Head request failed.');
+				retry = true;
+				retries++;
+				processedstats.sizeretry++;
+			}
 		}
 
 		if (!retry) {
@@ -655,10 +666,12 @@ async function sizecall(overide=false)
 					}
 					else
 					{
+						processedstats.skipped++;
 						console.log("Update size failed. Leaving out of queue. ")
 					}
 				}).catch((err)=>
 				{
+					processedstats.skipped++;
 					console.log("updateSize failed: "+err);
 				});
 			}
@@ -719,6 +732,7 @@ async function timecall() {
 
 		if (!job) {
 			console.log('Job Canceled.');
+			processedstats.skipped++;
 		}
 	}
 
