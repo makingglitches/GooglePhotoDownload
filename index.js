@@ -702,7 +702,7 @@ async function timecall() {
 	var queueswap = [];
 
 	// try to grab another 100 items waiting.
-	if (waiting.length + sizequeue.length == 0) {
+	if (pipes.length+ waiting.length + sizequeue.length == 0) {
 		waiting = await itemstore.getNext100Waiting(config.curraccount.userid);
 
 		for (var i in waiting) {
@@ -738,7 +738,7 @@ async function timecall() {
 
 	var message = '';
 
-	var waitingcount = await itemstore.getCountWaiting(config.curraccount.userid);
+	var waitingcount = await itemstore.getCountWaiting(config.curraccount.userid) - pipes.length;
 	var inmemqueue = waiting.length;
 	var inmemsize = sizequeue.length;
 
@@ -1018,9 +1018,11 @@ function createUser() {
 	if (config.userid) {
 		var userfound = findUser();
 
-		console.log("ADDED NEW USER TO ACCOUNTS ! UPDATE THE DIRECTORIES ACCORDINGLY AND RELOAD THIS PROGRAM !");
-
+	
 		if (!userfound) {
+
+			console.log("ADDED NEW USER TO ACCOUNTS ! UPDATE THE DIRECTORIES ACCORDINGLY AND RELOAD THIS PROGRAM !");
+
 			var acc = {
 				userid: config.userid,
 				title: 'Google User',
@@ -1055,54 +1057,54 @@ function loadUserStore() {
 
 // this doesn't seem possible without verifying the stupid app
 // the authorization scopes are set and PROBLEMO
-function testUpload(filename) {
-	//	var req = https.request('https://www.google.com', { method: 'get' });
+// function testUpload(filename) {
+// 	//	var req = https.request('https://www.google.com', { method: 'get' });
 
-	console.log('Uploading file: ' + filename);
+// 	console.log('Uploading file: ' + filename);
 
-	var mt = mime.lookup(filename);
+// 	var mt = mime.lookup(filename);
 
-	var options = {
-		method: 'POST',
-		port: 443,
-		// if authorization is set in an 'auth' field or not set it fucks up the whole request
-		// node itself throws a buried deep exception.
-		headers: {
-			'Content-Type': 'application/octet-stream',
-			'X-Goog-Upload-Content-Type': mt,
-			'X-Goog-Upload-Protocol': 'raw',
-			Authorization: 'Bearer ' + config.atoken.access_token
-		}
-	};
+// 	var options = {
+// 		method: 'POST',
+// 		port: 443,
+// 		// if authorization is set in an 'auth' field or not set it fucks up the whole request
+// 		// node itself throws a buried deep exception.
+// 		headers: {
+// 			'Content-Type': 'application/octet-stream',
+// 			'X-Goog-Upload-Content-Type': mt,
+// 			'X-Goog-Upload-Protocol': 'raw',
+// 			Authorization: 'Bearer ' + config.atoken.access_token
+// 		}
+// 	};
 
-	var bytesreq = https.request('https://photoslibrary.googleapis.com/v1/uploads', options, function(res) {
-		console.log('reached response.');
-		res.on('data', function(d) {
-			console.log('upload result data:');
-			console.log(d.toString());
-		});
-	});
+// 	var bytesreq = https.request('https://photoslibrary.googleapis.com/v1/uploads', options, function(res) {
+// 		console.log('reached response.');
+// 		res.on('data', function(d) {
+// 			console.log('upload result data:');
+// 			console.log(d.toString());
+// 		});
+// 	});
 
-	var buf = Buffer.alloc(10 * 1024 * 1024);
+// 	var buf = Buffer.alloc(10 * 1024 * 1024);
 
-	var infile = fs.openSync(filename, 'r');
+// 	var infile = fs.openSync(filename, 'r');
 
-	var bread = fs.readSync(infile, buf, 0, 10 * 1024 * 1024);
+// 	var bread = fs.readSync(infile, buf, 0, 10 * 1024 * 1024);
 
-	while (bread > 0) {
-		if (bread < 10 * 1024 * 1024) {
-			var destbuff = Buffer.alloc(bread);
-			buf.copy(destbuff, 0, 0, bread);
-			bytesreq.write(destbuff);
-		} else {
-			bytesreq.write(buf);
-		}
+// 	while (bread > 0) {
+// 		if (bread < 10 * 1024 * 1024) {
+// 			var destbuff = Buffer.alloc(bread);
+// 			buf.copy(destbuff, 0, 0, bread);
+// 			bytesreq.write(destbuff);
+// 		} else {
+// 			bytesreq.write(buf);
+// 		}
 
-		bread = fs.readSync(infile, buf, 0, 10 * 1024 * 1024);
-	}
+// 		bread = fs.readSync(infile, buf, 0, 10 * 1024 * 1024);
+// 	}
 
-	bytesreq.end();
-}
+// 	bytesreq.end();
+// }
 
 function backupFile(filename) {
 	var dir = path.dirname(filename);
@@ -1117,6 +1119,3 @@ function backupFile(filename) {
 	console.log('Backed up: ' + filename + ' to backup file: ' + d1);
 }
 
-function statswrite() {
-	fs.writeFileSync('stats.json');
-}
