@@ -47,6 +47,7 @@ var processedstats = {
 	skipped:0
 };
 
+
 //loadandsortStored();
 loadUserStore();
 backupFile('itemstore.json');
@@ -100,6 +101,9 @@ const itemstore = require('./storemgr/itemstore');
 const { UpdateSize } = require('./storemgr/itemstore');
 
 itemstore.InitDB(OpenDatabase());
+
+
+
 
 auth(passport);
 
