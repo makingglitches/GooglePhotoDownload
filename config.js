@@ -16,7 +16,7 @@
 
 var fs = require('fs');
 
-var obj = JSON.parse( fs.readFileSync('client_id copy.json'));
+var obj = JSON.parse( fs.readFileSync('client_id.json'));
 
 
 const config = {};
@@ -50,6 +50,7 @@ config.port = 8080;
 config.scopes = [
   'https://www.googleapis.com/auth/photoslibrary.readonly',
   'profile',
+  'email'
 ];
 
 // The number of photos to load for search requests.
