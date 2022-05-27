@@ -36,6 +36,8 @@ module.exports = (passport) => {
         clientID: config.oAuthClientID,
         clientSecret: config.oAuthclientSecret,
         callbackURL: config.oAuthCallbackUrl,
+        scope: ['https://www.googleapis.com/auth/userinfo.email', 
+                'https://www.googleapis.com/auth/userinfo.profile', 'openid'],
         // Set the correct profile URL that does not require any additional APIs
         userProfileURL: 'https://www.googleapis.com/oauth2/v3/userinfo'
       },
