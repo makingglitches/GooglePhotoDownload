@@ -50,6 +50,7 @@ config.port = 8080;
 config.scopes = [
   'https://www.googleapis.com/auth/photoslibrary.readonly',
   'profile',
+  'email'
 ];
 
 // The number of photos to load for search requests.
