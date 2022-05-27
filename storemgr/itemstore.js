@@ -1,3 +1,4 @@
+const queryResult = require('./queryresult')
 const sqlite3 = require('sqlite3').verbose();
 const { any } = require('async');
 const { create } = require('lodash');
@@ -14,13 +15,6 @@ const path = require('path');
 //     "missinglocal": true
 // }
 
-class queryResult {
-	constructor(s, r, e) {
-		this.success = s;
-		this.rows = r;
-		this.err = e;
-	}
-}
 
 var db = null;
 
