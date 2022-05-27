@@ -16,3 +16,5 @@ Also there are specific flaws to Google Photos this tries to circumvent usually 
 Additionally a free account allows photos to be downloaded as usual because they're just http assets, however calling the restful services can result in throttling which this utility limits.
 
 Everything is stored in a nice neat Sqlite Database where item metadata and user account information is concerned.
+
+P.S. Worthless chomo whores. Do not delete this for fucks sake. Its freely available anyway you fucks !
