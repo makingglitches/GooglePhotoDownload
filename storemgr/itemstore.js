@@ -327,7 +327,7 @@ async function setWaitTillNextFromQueue(userid) {
 }
 
 async function getNext100Waiting(userid) {
-	sql = 'select * from StoreItem where WaitTillNext=1 and userid=? and MediaItemError404=0 limit 100';
+	sql = 'select * from StoreItem where WaitTillNext=1 and userid=? and MediaItemError404=0 and SizeUpdateFailureCount < 21 limit 100';
 
 	var res = await getrows(db, sql, [ userid ]);
 
@@ -357,7 +357,7 @@ async function createNewStoreItemsFromQueue(userid) {
 }
 
 async function getCountWaiting(userid) {
-	var sql = 'select count(*) as waitingcount from StoreItem where userid=? and waittillnext=1';
+	var sql = 'select count(*) as waitingcount from StoreItem where userid=? and  SizeUpdateFailureCount <21 and waittillnext=1';
 
 	var res = await getrows(db, sql, [ userid ]);
 
@@ -377,6 +377,24 @@ async function resolveMissingLocalSizeandDownload(userid) {
 				where userid=? and mediaitemerror404=0`;
 
 	var res = getrows(db, sql, [ userid ]);
+
+	return res.success;
+}
+
+async function IncrementSizeFailure(id)
+{
+	var sql = 'update StoreItem set SizeUpdateFailureCount = SizeUpdateFailureCount +1 where Id=?'
+
+	var res = getrows(db,sql,[id]);
+
+	return res.success;
+
+}
+
+async function ClearSizeFailureCount(userid)
+{
+	var sql = 'update StoreItem set SizeUpdateFailureCount = 0 where userid=?'
+	var res = getrows(db,sql,[userid]);
 
 	return res.success;
 }
@@ -410,5 +428,7 @@ module.exports = {
 	setOnlineStatusFromQueue: setOnlineStatusFromQueue,
 	UpdateMissingLocalByNames: UpdateMissingLocalByNames,
 	UpdateMissingDownloadsByNames: UpdateMissingDownloadsByNames,
-	resolveMissingLocalSizeandDownload: resolveMissingLocalSizeandDownload
+	resolveMissingLocalSizeandDownload: resolveMissingLocalSizeandDownload,
+	IncrementSizeFailure: IncrementSizeFailure,
+	ClearSizeFailureCount: ClearSizeFailureCount
 };

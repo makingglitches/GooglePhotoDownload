@@ -157,6 +157,29 @@ var items=[];
             
         });
 
+        $('#clearsizefail').click(function()
+        {
+            $.ajax(
+                {
+                    type: 'GET',
+                    url: '/clearsizefail',
+                    dataType: 'json',
+                    data: {},
+                    success: (data) =>
+                    {
+                        console.log('cleared size failure flags.')
+                    },
+                    error: (jq,tx,err) =>
+                    {
+                        console.log("threw an error ");
+                        console.log(tx);
+                        console.log(err);
+                    }        
+                }
+                );
+            
+        });
+
         $.get('/info', (data) =>
         {
             $('#username').html(data);
@@ -164,6 +187,8 @@ var items=[];
         
     }
     );
+
+
 
     var refreshdata = null;
 
@@ -178,9 +203,10 @@ var items=[];
     <a id="getalbums" href="javascript:void(0)">Click to retrieve albums</a><br>
     <a id="getitems" href="javascript:void(0)">Click to retrieve photo list</a><br>
     <a id="grabitems" href="javascript:void(0)">Click to re-download items</a><br>
-    <a id="forcerefresh" href="javascript:void(0)">Force refresh of access token</a>
-    <a id="upload" href="javascript:void(0)">Test Upload</a>
-    <a id="userinst" href="javascript:void(0)">GetUserInstanceData</a>
+    <a id="clearsizefail" href="javascript:void(0)">Click to clear size update failures.</a><br>
+    <a id="forcerefresh" href="javascript:void(0)">Force refresh of access token</a><br>
+    <a id="upload" href="javascript:void(0)">Test Upload</a><br>
+    <a id="userinst" href="javascript:void(0)">GetUserInstanceData</a><br>
 </body>
 
 </html>

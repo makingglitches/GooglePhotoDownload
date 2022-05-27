@@ -206,6 +206,14 @@ app.get('/logout', (req, res) => {
 	res.redirect('/');
 });
 
+app.get('/clearsizefail', async(req,res) => 
+	{
+		await itemstore.ClearSizeFailureCount(config.userid)
+		console.log("Cleared Size Flags.")
+		res.sendStatus(200);
+
+	});
+
 function acallback(arg1, arg2, arg3, arg4) {
 	console.log('reached auth callback');
 }
@@ -438,6 +446,8 @@ async function updateSize(storeitem, maxretries=5) {
 					// returns blank response it seems.
 					retry = true;
 					retries++;
+					itemstore.IncrementSizeFailure(storeitem.Id)
+					storeitem.SizeUpdateFailureCount++;
 					console.log('Get header failed for ' + storeitem.FileNameOnServer);
 				} else {
 					// size update happens here.
@@ -448,12 +458,16 @@ async function updateSize(storeitem, maxretries=5) {
 
 			if (err.statusCode==500)
 			{
+				itemstore.IncrementSizeFailure(storeitem.Id)
+				storeitem.SizeUpdateFailureCount++;
 				console.log("Head request failed with error 500, excluding from this session.");
 				await itemstore.MarkWaitTillNext(storeitem.Id, false);
 				return {Success:false, item:storeitem};
 			}
 			else
 			{
+				itemstore.IncrementSizeFailure(storeitem.Id)
+				storeitem.SizeUpdateFailureCount++;
 				console.log('Head request failed.');
 				retry = true;
 				retries++;
@@ -687,6 +701,17 @@ async function sizecall(overide=false)
 					else
 					{
 						processedstats.skipped++;
+					//	itemstore.IncrementSizeFailure(v.item.Id)
+
+						if (v.item.SizeUpdateFailureCount > 20)
+						{
+							itemstore.MarkWaitTillNext(v.item.Id,true);
+
+							lodash.remove(waiting,function(i) { return i.Id == v.item.Id});
+							lodash.remove(queueswap, function(i) {return i.Id == v.item.Id});
+							//console.log("Size Failed For Item more than 20 times, removed from queue.");	
+						}
+
 						console.log("Update size failed. Leaving out of queue. ")
 					}
 				}).catch((err)=>

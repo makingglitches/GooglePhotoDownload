@@ -22,6 +22,8 @@ var obj = JSON.parse( fs.readFileSync('client_id.json'));
 const config = {};
 
 // this is temporary and relates to feature enhancement 
+config.searchdirectory = "/run/media/john/Data/Data/Desktop/Combined Photos etc/GoogleAccounts"
+
 
 config.fasttest = false;
 
