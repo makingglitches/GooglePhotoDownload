@@ -1045,6 +1045,8 @@ function createUser() {
 
 			var acc = {
 				userid: config.userid,
+				username: config.username,
+				emailid: config.emailid,
 				title: 'Google User',
 				localdirectory: config.defaultlocaldir,
 				onserverdirectory: config.defaultpulldir+'/'+ config.username+ '/'+config.defaultonserverdir,

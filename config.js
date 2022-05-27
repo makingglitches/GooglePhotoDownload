@@ -21,6 +21,8 @@ var obj = JSON.parse( fs.readFileSync('client_id.json'));
 
 const config = {};
 
+// this is temporary and relates to feature enhancement 
+
 config.fasttest = false;
 
 // absolute path to where unprocessed mp4s reside
