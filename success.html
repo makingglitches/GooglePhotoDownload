@@ -11,6 +11,7 @@ var items=[];
     $(document).ready( function()
     {
 
+
         $('#getitems').click(function()
         {
             $.ajax(
@@ -156,6 +157,10 @@ var items=[];
             
         });
 
+        $.get('/info', (data) =>
+        {
+            $('#username').html(data);
+        } )
         
     }
     );
@@ -169,6 +174,7 @@ var items=[];
 
 <body>
     Success !<br>
+    Logged in as <span id="username">username</span><br>
     <a id="getalbums" href="javascript:void(0)">Click to retrieve albums</a><br>
     <a id="getitems" href="javascript:void(0)">Click to retrieve photo list</a><br>
     <a id="grabitems" href="javascript:void(0)">Click to re-download items</a><br>

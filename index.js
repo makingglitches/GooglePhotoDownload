@@ -59,6 +59,7 @@ backupFile('accountstores.json');
 console.log('deleting sessions subdirectory');
 fs.rmSync('./sessions', { recursive: true, force: true });
 
+
 const app = express();
 
 const fileStore = sessionFileStore(session);
@@ -144,6 +145,10 @@ app.use((req, res, next) => {
 		res.locals.avatarUrl = req.user.profile.photos[0].value;
 	}
 	next();
+});
+
+app.get('/info', (req,res) => {
+	res.send(config.username+"&lt;"+config.emailid+"&gt;");
 });
 
 app.get('/', (req, res) => {
@@ -238,7 +243,10 @@ app.get(
 		// moved this to be called by authenbticate callback.
 		//	refreshtimerrestart();
 
+		// grab information about current user post authentication
 		config.userid = req.user.profile.id;
+		config.emailid = req.user.profile.emails[0].value
+		config.username =   config.emailid.substring(0, config.emailid.indexOf('@'))
 
 		loadUserStore();
 
@@ -487,6 +495,14 @@ async function refreshStoredUrl(storeitem) {
 
 //TODO: MOVE THIS TO BEGINNING
 function OpenDatabase() {
+
+	console.log("Item Store database doesn't exist, creating.")
+
+	if (!fs.existsSync("ItemStore.sqlite"))
+	{
+		fs.copyFileSync("EmptyStoreDB.sqlite", 'ItemStore.sqlite');
+	}
+
 	var db = new sql.Database('ItemStore.sqlite');
 	return db;
 }
@@ -1031,9 +1047,22 @@ function createUser() {
 				userid: config.userid,
 				title: 'Google User',
 				localdirectory: config.defaultlocaldir,
-				onserverdirectory: config.defaultonserverdir,
-				destdir: config.defaultpulldir
+				onserverdirectory: config.defaultpulldir+'/'+ config.username+ '/'+config.defaultonserverdir,
+				destdir: config.defaultpulldir + '/'+config.username
 			};
+
+
+			console.log("CREATING DIRECTORY STRUCTURE");
+
+			if (!fs.existsSync(acc.destdir))
+			{
+				fs.mkdirSync(acc.destdir);
+			}
+
+			if (!fs.existsSync(acc.onserverdirectory))
+			{
+				fs.mkdirSync(acc.onserverdirectory);
+			}
 
 			accounts.push(acc);
 			config.curraccount = acc;

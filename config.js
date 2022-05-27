@@ -22,9 +22,15 @@ var obj = JSON.parse( fs.readFileSync('client_id.json'));
 const config = {};
 
 config.fasttest = false;
+
+// absolute path to where unprocessed mp4s reside
 config.defaultlocaldir = '/Data/Desktop/Combined Photos etc/mp4locals';
-config.defaultonserverdir= '/Data/Desktop/Combined Photos etc/mp4sonserver';
-config.defaultpulldir='/Data/Desktop/Combined Photos etc/techguyalpha';
+
+// subdirectory name to place mp4s that exist on server
+config.defaultonserverdir= 'mp4sonserver';
+
+// directory where account files will reside
+config.defaultpulldir='/Data/Desktop/Combined Photos etc';
 
 
 
