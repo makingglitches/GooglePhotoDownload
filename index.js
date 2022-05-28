@@ -50,8 +50,8 @@ var processedstats = {
 
 //loadandsortStored();
 loadUserStore();
-backupFile('itemstore.json');
-backupFile('accountstores.json');
+//backupFile('itemstore.json');
+//backupFile('accountstores.json');
 
 // on occasion the sessions directory will interfere with oauth 2, and for some reason
 // this will cause the wrong authentication token to be passed into the express stack.
@@ -100,8 +100,10 @@ const { CONNREFUSED } = require('dns');
 const { debounce, size } = require('lodash');
 const itemstore = require('./storemgr/itemstore');
 const { UpdateSize } = require('./storemgr/itemstore');
+const GoogleAccount = require('./storemgr/googleaccount.js');
 
-itemstore.InitDB(OpenDatabase());
+var universaldb = OpenDatabase()
+itemstore.InitDB(universaldb);
 
 
 
@@ -243,7 +245,7 @@ app.get('/jquery.js', (req, res) => {
 app.get(
 	'/auth/google/callback',
 	passport.authenticate('google', { failureRedirect: '/', failureFlash: true, session: true }),
-	(req, res) => {
+	async (req, res) => {
 		// User has logged in.
 
 		console.log('User has logged in.');
@@ -256,7 +258,18 @@ app.get(
 		config.emailid = req.user.profile.emails[0].value
 		config.username =   config.emailid.substring(0, config.emailid.indexOf('@'))
 
-		loadUserStore();
+		var userexists = await GoogleAccount.CheckExistsDb(universaldb,config.userid);
+
+		if (!userexists)
+		{
+			createUser();
+		}
+		else
+		{
+			findUser();
+		}
+
+		//loadUserStore();
 
 		//loadandsortStored();
 
@@ -1063,20 +1076,21 @@ function createUser() {
 	if (config.userid) {
 		var userfound = findUser();
 
-	
 		if (!userfound) {
 
 			console.log("ADDED NEW USER TO ACCOUNTS ! UPDATE THE DIRECTORIES ACCORDINGLY AND RELOAD THIS PROGRAM !");
+			
+			var acc = new GoogleAccount(
+				config.userid,
+				config.username,
+				config.emailid,
+				'Google User',
+				config.defaultlocaldir,
+				config.defaultpulldir+'/'+ config.username+ '/'+config.defaultonserverdir,
+				config.defaultpulldir + '/'+config.username
+			);
 
-			var acc = {
-				userid: config.userid,
-				username: config.username,
-				emailid: config.emailid,
-				title: 'Google User',
-				localdirectory: config.defaultlocaldir,
-				onserverdirectory: config.defaultpulldir+'/'+ config.username+ '/'+config.defaultonserverdir,
-				destdir: config.defaultpulldir + '/'+config.username
-			};
+			acc.InsertInDb(universaldb);
 
 
 			console.log("CREATING DIRECTORY STRUCTURE");
@@ -1092,6 +1106,7 @@ function createUser() {
 			}
 
 			accounts.push(acc);
+
 			config.curraccount = acc;
 
 			return acc;
@@ -1102,17 +1117,19 @@ function createUser() {
 }
 
 function writeUserStore() {
-	createUser();
-	fs.writeFileSync('accountstores.json', JSON.stringify(accounts));
+	// this has been moved to sqlite database storage.
+	// createUser();
+	// fs.writeFileSync('accountstores.json', JSON.stringify(accounts));
 }
 
 function loadUserStore() {
-	if (!fs.existsSync('accountstores.json')) {
-		writeUserStore();
-	} else {
-		accounts = JSON.parse(fs.readFileSync('accountstores.json'));
-		writeUserStore();
-	}
+	// this has been moved to sqlite database storage
+	// if (!fs.existsSync('accountstores.json')) {
+	// 	writeUserStore();
+	// } else {
+	// 	accounts = JSON.parse(fs.readFileSync('accountstores.json'));
+	// 	writeUserStore();
+	// }
 }
 
 // this doesn't seem possible without verifying the stupid app

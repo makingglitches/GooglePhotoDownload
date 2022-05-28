@@ -1,3 +1,5 @@
+
+const getrows = require('./getRows')
 const queryResult = require('./queryresult')
 const sqlite3 = require('sqlite3').verbose();
 const { any } = require('async');
@@ -17,30 +19,6 @@ const path = require('path');
 
 
 var db = null;
-
-async function getrows(db, sql, params = null, debug = false) {
-	if (params == null) {
-		params = [];
-	}
-
-	var rows = await new Promise((resolve, reject) => {
-		db.all(sql, params, (err, rows) => {
-			if (err) {
-				resolve(new queryResult(false, rows, err));
-			}
-
-			if (debug) {
-				rows.forEach((row) => {
-					console.log(row);
-				});
-			}
-
-			resolve(new queryResult(true, rows, err));
-		});
-	});
-
-	return rows;
-}
 
 // async function runsql(db, sql, params = null) {
 // 	if (params == null) {
@@ -400,7 +378,6 @@ module.exports = {
 	SetVideoOption: SetVideoOption,
 	getItemCount: getItemCount,
 	GetById: GetById,
-	queryResult: queryResult,
 	GetItems: GetItems,
 	GetUnfinishedItems: GetUnfinishedItems,
 	getrows: getrows,
