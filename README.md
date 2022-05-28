@@ -18,3 +18,5 @@ Additionally a free account allows photos to be downloaded as usual because they
 Everything is stored in a nice neat Sqlite Database where item metadata and user account information is concerned.
 
 P.S. Worthless chomo whores. Do not delete this for fucks sake. Its freely available anyway you fucks !
+
+Also for sake of simply stating this, I think Node Js is the most horrific language I've ever chosen to work with. Ruby looks like it exceeds it however, so at least there is that.
