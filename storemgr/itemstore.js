@@ -137,6 +137,13 @@ async function GetItems(userid = null, offset = null, limit = null) {
 	return r.success && r.rows.length > 0 ? r.rows : null;
 }
 
+async function getMissingSizeCount(userid)
+{
+	var sql = 'select count(*) as countnosize from storeitem where sizeonserver == -1 and userid=? and processsize=1';
+	var r = await getrows(db,sql,[userid]);
+	return r.rows[0]['countnosize'];
+}
+
 async function GetUnfinishedItems(userid = null, offset = null, limit = null) {
 	var sql =
 		' select * from storeitem ' +
@@ -319,9 +326,31 @@ async function setOnlineStatusFromQueue(userid) {
 
 async function createNewStoreItemsFromQueue(userid) {
 	var sql =
-		'insert into StoreItem(Id,FileNameOnServer,MediaData,UserId,WaitTillNext) ' +
-		'select q.id, q.filename, q.mediadata, ?, 1 from queuestore q ' +
-		'where not exists (select null from storeitem s where  s.id=q.id and s.userid=? ) ';
+	`insert into StoreItem(Id,FileNameOnServer,MediaData,UserId,WaitTillNext)
+	select q3.Id, q3.FileName, q3.MediaData, ? ,1 from queuestore q3
+	where not exists (select null from storeitem s where s.id = q3.id)
+	group by q3.id having count(*) = 1
+	
+	union
+	
+	SELECT distinct q3.Id, q3.FileName, q3.MediaData, ?,1 FROM QUEUESTORE Q3
+	inner JOIN
+	(select
+	distinct q.id,
+	(
+	select json_extract(q2.mediadata,'$.creationTime') AS DATE1 FROM QUEUESTORE Q2
+	WHERE Q2.ID = Q.ID
+	ORDER BY DATE1 ASC
+	LIMIT 1
+	) AS DATE1
+	FROM QUEUESTORE Q
+	GROUP BY Q.ID
+	HAVING COUNT(*) > 1) AS T
+	
+	ON T.ID = Q3.ID AND JSON_EXTRACT(Q3.MEDIADATA,'$.creationTime') = T.date1
+	
+	where not exists (select null from storeitem s where s.id = q3.id)
+	order by q3.filename`
 
 	var res = await getrows(db, sql, [ userid, userid ]);
 
@@ -365,8 +394,26 @@ async function IncrementSizeFailure(id)
 
 async function ClearSizeFailureCount(userid)
 {
-	var sql = 'update StoreItem set SizeUpdateFailureCount = 0 where userid=?'
+	var sql = 'update StoreItem set SizeUpdateFailureCount = 0, ProcessSize=1 where userid=? and SizeUpdateFailureCount > 0'
 	var res = getrows(db,sql,[userid]);
+
+	return res.success;
+}
+
+async function getNext100WaitingSize(userid)
+{
+	var sql = 'select * from StoreItem where processsize=1 and sizeonserver=-1  and userid=? limit 100'
+
+	var res = await getrows(db,sql, [userid]);
+
+	return res.success ? res.rows: null;
+}
+
+async function updateProcessSize(id,process)
+{
+	var sql = 'update StoreItem set Processsize =? where Id=? ';
+
+	var res = await getrows(db,sql,[process,id]);
 
 	return res.success;
 }
@@ -401,5 +448,8 @@ module.exports = {
 	UpdateMissingDownloadsByNames: UpdateMissingDownloadsByNames,
 	resolveMissingLocalSizeandDownload: resolveMissingLocalSizeandDownload,
 	IncrementSizeFailure: IncrementSizeFailure,
-	ClearSizeFailureCount: ClearSizeFailureCount
+	ClearSizeFailureCount: ClearSizeFailureCount,
+	getMissingSizeCount: getMissingSizeCount,
+	getNext100WaitingSize: getNext100WaitingSize,
+	updateProcessSize:updateProcessSize
 };

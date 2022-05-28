@@ -25,7 +25,7 @@ const sizeof = require('object-sizeof');
 const items = require('./storemgr/itemstore');
 const sql = require('sqlite3').verbose();
 
-const nodownload = false;
+var nodownload = false;
 
 config.startService = refreshtimerrestart;
 
@@ -44,15 +44,8 @@ var processedstats = {
 	itemretry: 0,
 	item: 0,
 	mediaerror404: 0,
-	skipped:0
+	skipped: 0
 };
-
-
-//loadandsortStored();
-loadUserStore().then((val) =>
-{
-	console.log("Accounts Loaded.")
-});
 
 //backupFile('itemstore.json');
 //backupFile('accountstores.json');
@@ -62,7 +55,6 @@ loadUserStore().then((val) =>
 // which of course causes all network transactions with the photos api to fail.
 console.log('deleting sessions subdirectory');
 fs.rmSync('./sessions', { recursive: true, force: true });
-
 
 const app = express();
 
@@ -106,11 +98,18 @@ const itemstore = require('./storemgr/itemstore');
 const { UpdateSize } = require('./storemgr/itemstore');
 const GoogleAccount = require('./storemgr/googleaccount.js');
 
-var universaldb = OpenDatabase()
+var universaldb = OpenDatabase();
 itemstore.InitDB(universaldb);
 
-
-
+//loadandsortStored();
+loadUserStore().then(
+	(val) => {
+		console.log('Accounts Loaded.');
+	},
+	(reason) => {
+		console.log('Accounts Load Failed: ' + reason);
+	}
+);
 
 auth(passport);
 
@@ -153,10 +152,10 @@ app.use((req, res, next) => {
 	next();
 });
 
-app.get('/info', (req,res) => {
-	res.send(config.username+"&lt;"+config.emailid+"&gt;");
+app.get('/info', (req, res) => {
+	res.send(config.username + '&lt;' + config.emailid + '&gt;');
 });
-
+-
 app.get('/', (req, res) => {
 	if (!checkauth()) {
 		console.log('sending user to authenticate page.');
@@ -170,12 +169,12 @@ app.get('/', (req, res) => {
 
 //TODO: UPDATE THIS TO USE SQLITE.
 app.post('/redownloadstart', async (req, res) => {
+	nodownload = false;
 	processedstats.userid = config.userid;
 	var res1 = await CheckDownloads();
 	var totals = await MoveOriginalsUpdateStore();
-			// resolve the problem where original size is less than that on server but the original is missing
-		var res2 = await itemstore.resolveMissingLocalSizeandDownload(config.curraccount.userid);
-
+	// resolve the problem where original size is less than that on server but the original is missing
+	var res2 = await itemstore.resolveMissingLocalSizeandDownload(config.curraccount.userid);
 
 	endtimer = false;
 
@@ -183,6 +182,16 @@ app.post('/redownloadstart', async (req, res) => {
 	// in redesign queue timer will begin querying the database for items to run.
 
 	timecall();
+});
+
+app.get('/updatesizes', async (req, res) => {
+	var count = await itemstore.getMissingSizeCount(config.curraccount.userid);
+
+	console.log('There are ' + count + ' items for current user without sizes set.');
+
+	nodownload = true;
+	console.log("Starting Timer.")
+	sizetimecall();
 });
 
 app.get('/getlist', async (req, res) => {
@@ -195,7 +204,6 @@ app.get('/getlist', async (req, res) => {
 		var locals = await MoveOriginalsUpdateStore();
 		// resolve the problem where original size is less than that on server but the original is missing
 		var res2 = await itemstore.resolveMissingLocalSizeandDownload(config.curraccount.userid);
-
 
 		res.status(200).send({ message: 'completed', totals: total, local: locals });
 
@@ -212,13 +220,14 @@ app.get('/logout', (req, res) => {
 	res.redirect('/');
 });
 
-app.get('/clearsizefail', async(req,res) => 
-	{
-		await itemstore.ClearSizeFailureCount(config.userid)
-		console.log("Cleared Size Flags.")
-		res.sendStatus(200);
+app.get('/clearsizefail', async (req, res) => {
+	await itemstore.ClearSizeFailureCount(config.userid);
+	console.log('Cleared Size Flags.');
+	var count = await itemstore.getMissingSizeCount(config.curraccount.userid);
+	console.log('There are ' + count + ' items for current user without sizes set.');
 
-	});
+	res.sendStatus(200);
+});
 
 function acallback(arg1, arg2, arg3, arg4) {
 	console.log('reached auth callback');
@@ -259,17 +268,14 @@ app.get(
 
 		// grab information about current user post authentication
 		config.userid = req.user.profile.id;
-		config.emailid = req.user.profile.emails[0].value
-		config.username =   config.emailid.substring(0, config.emailid.indexOf('@'))
+		config.emailid = req.user.profile.emails[0].value;
+		config.username = config.emailid.substring(0, config.emailid.indexOf('@'));
 
-		var userexists = await GoogleAccount.CheckExistsDb(universaldb,config.userid);
+		var userexists = await GoogleAccount.CheckExistsDb(universaldb, config.userid);
 
-		if (!userexists)
-		{
+		if (!userexists) {
 			createUser();
-		}
-		else
-		{
+		} else {
 			findUser();
 		}
 
@@ -297,20 +303,17 @@ function pushtoQueue(destfilename, storeitem) {
 	waiting.push({ filename: destfilename, item: storeitem });
 }
 
-
-async function CheckDownloads()
-{
+async function CheckDownloads() {
 	// fuck them i did this before.
-	var files= recursepath(config.curraccount.destdir).map(function(v){ return path.basename(v)});
+	var files = recursepath(config.curraccount.destdir).map(function(v) {
+		return path.basename(v);
+	});
 
-	await itemstore.UpdateMissingDownloadsByNames(files,config.curraccount.userid);
-
+	await itemstore.UpdateMissingDownloadsByNames(files, config.curraccount.userid);
 }
-
 
 //FINISHED
 async function MoveOriginalsUpdateStore() {
-
 	// get the files locally stored, and recurse through these paths finding all video files
 	var paths = [ config.curraccount.onserverdirectory, config.curraccount.localdirectory ];
 	var files = [];
@@ -381,7 +384,7 @@ async function MoveOriginalsUpdateStore() {
 			var szupdated = false;
 
 			if (found.Obj.SizeOnServer == -1) {
-				szupdated= true;
+				szupdated = true;
 				var res = await updateSize(found.Obj, 5);
 				if (!res.Success) {
 					console.log('Could not update size. Deletion could be accidental, skipping.');
@@ -392,15 +395,14 @@ async function MoveOriginalsUpdateStore() {
 			if (fs.existsSync(localdl)) {
 				var statdl = fs.statSync(localdl);
 
-				if (statdl.size != found.Obj.SizeOnServer && !szupdated)
-				{
-						var res = await updateSize(found.Obj, 5);
-						if (!res.Success) {
-							console.log('Could not update size. Deletion could be accidental, skipping.');
-							continue;
-						}
+				if (statdl.size != found.Obj.SizeOnServer && !szupdated) {
+					var res = await updateSize(found.Obj, 5);
+					if (!res.Success) {
+						console.log('Could not update size. Deletion could be accidental, skipping.');
+						continue;
+					}
 				}
-				
+
 				// google occasionally reports values less than it should
 				// size wise and then these can be viewed and are of quality just the same.
 				if (statdl.size < found.Obj.SizeOnServer) {
@@ -421,17 +423,16 @@ async function MoveOriginalsUpdateStore() {
 		}
 	}
 
-	console.log("LocalOnly: "+localonlycount+" OnServer: "+onservercount);
+	console.log('LocalOnly: ' + localonlycount + ' OnServer: ' + onservercount);
 
 	return { local: localonlycount, server: onservercount };
 }
 
 //FINISHED
-async function updateSize(storeitem, maxretries=5) {
-
-	if (maxretries <=0 )
-	{
-		throw "Maxtries in updateSize CANNOT BE <=0 ! This will cause a fatal error.";
+async function updateSize(storeitem, maxretries = 5) {
+	
+	if (maxretries <= 0) {
+		throw 'Maxtries in updateSize CANNOT BE <=0 ! This will cause a fatal error.';
 	}
 
 	processedstats.size++;
@@ -442,7 +443,7 @@ async function updateSize(storeitem, maxretries=5) {
 	if (!url) {
 		console.log("Size Update Canceled, couldn't retrieve url.");
 		await itemstore.UpdateSize(storeitem.Id, -1);
-		return {Success:false, item:storeitem};
+		return { Success: false, item: storeitem };
 	}
 
 	console.log('Found URL: ' + url);
@@ -463,7 +464,7 @@ async function updateSize(storeitem, maxretries=5) {
 					// returns blank response it seems.
 					retry = true;
 					retries++;
-					itemstore.IncrementSizeFailure(storeitem.Id)
+					itemstore.IncrementSizeFailure(storeitem.Id);
 					storeitem.SizeUpdateFailureCount++;
 					console.log('Get header failed for ' + storeitem.FileNameOnServer);
 				} else {
@@ -472,18 +473,14 @@ async function updateSize(storeitem, maxretries=5) {
 				}
 			});
 		} catch (err) {
-
-			if (err.statusCode==500)
-			{
-				itemstore.IncrementSizeFailure(storeitem.Id)
+			if (err.statusCode == 500) {
+				itemstore.IncrementSizeFailure(storeitem.Id);
 				storeitem.SizeUpdateFailureCount++;
-				console.log("Head request failed with error 500, excluding from this session.");
+				console.log('Head request failed with error 500, excluding from this session.');
 				await itemstore.MarkWaitTillNext(storeitem.Id, false);
-				return {Success:false, item:storeitem};
-			}
-			else
-			{
-				itemstore.IncrementSizeFailure(storeitem.Id)
+				return { Success: false, item: storeitem };
+			} else {
+				itemstore.IncrementSizeFailure(storeitem.Id);
 				storeitem.SizeUpdateFailureCount++;
 				console.log('Head request failed.');
 				retry = true;
@@ -499,15 +496,16 @@ async function updateSize(storeitem, maxretries=5) {
 
 	if (retries >= maxretries) {
 		console.log('Failed to Update Size.');
-		return {Success:false, item:storeitem};
+		return { Success: false, item: storeitem };
 	} else {
 		console.log('Updated size.');
-		return {Success:true, item:storeitem};
+		return { Success: true, item: storeitem };
 	}
 }
 
 //TODO: TEST THIS
 async function refreshStoredUrl(storeitem) {
+	//console.log("started refresh of url")
 	var result = await getPhotoItem(storeitem.Id, 5);
 
 	if (!result) {
@@ -526,12 +524,10 @@ async function refreshStoredUrl(storeitem) {
 
 //TODO: MOVE THIS TO BEGINNING
 function OpenDatabase() {
+	console.log("Item Store database doesn't exist, creating.");
 
-	console.log("Item Store database doesn't exist, creating.")
-
-	if (!fs.existsSync("ItemStore.sqlite"))
-	{
-		fs.copyFileSync("EmptyStoreDB.sqlite", 'ItemStore.sqlite');
+	if (!fs.existsSync('ItemStore.sqlite')) {
+		fs.copyFileSync('EmptyStoreDB.sqlite', 'ItemStore.sqlite');
 	}
 
 	var db = new sql.Database('ItemStore.sqlite');
@@ -542,18 +538,17 @@ function OpenDatabase() {
 async function startJob(destfilename, storeitem) {
 	//	var db = OpenDatabase();
 
-	if (fs.existsSync(destfilename))
-	{
-		var stat = fs.statSync(destfilename)
+	if (fs.existsSync(destfilename)) {
+		var stat = fs.statSync(destfilename);
 		{
-			if (storeitem.SizeOnServer <= stat.size)
-			{
-				console.log("Check file: "+storeitem.FileNameOnServer);
-				console.log("Had no size defined ahead of download call, but file exists and is larger to or equal to size on server.");
+			if (storeitem.SizeOnServer <= stat.size) {
+				console.log('Check file: ' + storeitem.FileNameOnServer);
+				console.log(
+					'Had no size defined ahead of download call, but file exists and is larger to or equal to size on server.'
+				);
 				return null;
 			}
 		}
-
 	}
 
 	var url = await refreshStoredUrl(storeitem);
@@ -678,13 +673,11 @@ async function startJob(destfilename, storeitem) {
 	return ostream;
 }
 
-var sizequeue=[];
+var sizequeue = [];
 var sizerunning = false;
 
-async function sizecall(overide=false)
-{
-	if (sizerunning && !overide)
-	{
+async function sizecall(overide = false) {
+	if (sizerunning && !overide) {
 		// like a fork. sort of. if true this method should already be running or waiting for a timer call.
 		// override should only be set from inside this call.
 		return;
@@ -693,64 +686,115 @@ async function sizecall(overide=false)
 	sizerunning = true;
 	var queueswap = [];
 
-	while (sizequeue.length > 0)
-	{
+	while (sizequeue.length > 0) {
 		var item = sizequeue.shift();
 
 		// we should never encounter this if either the updatesize is not running or we already have a size.
 		// so add back into queue and/or start the updatesize job.
-		if (item.SizeOnServer == -1)
-		{
+		if (item.SizeOnServer == -1) {
 			queueswap.push(item);
-		
-			if (!item.running)
-			{			
+
+			if (!item.running) {
 				item.running = true;
 
-				updateSize(item).then( (v)=>
-				{
-					if (v.Success)
-					{
-						console.log("Adding item to waiting download queue. Size Updated.");
-						console.log(v.item.SizeOnServer);
-						waiting.push(v.item);
-					}
-					else
-					{
-						processedstats.skipped++;
-					//	itemstore.IncrementSizeFailure(v.item.Id)
+				updateSize(item)
+					.then((v) => {
+						if (v.Success) {
+							if (!nodownload) {
+								console.log('Adding item to waiting download queue. Size Updated.');
+								waiting.push(v.item);
+							} else {
+								console.log('Size Updated.');
+							}
 
-						if (v.item.SizeUpdateFailureCount > 20)
-						{
-							itemstore.MarkWaitTillNext(v.item.Id,true);
+							console.log(v.item.SizeOnServer);
+						} else {
+							processedstats.skipped++;
+							//	itemstore.IncrementSizeFailure(v.item.Id)
 
-							lodash.remove(waiting,function(i) { return i.Id == v.item.Id});
-							lodash.remove(queueswap, function(i) {return i.Id == v.item.Id});
-							//console.log("Size Failed For Item more than 20 times, removed from queue.");	
+							if (v.item.SizeUpdateFailureCount > 20) {
+								itemstore.MarkWaitTillNext(v.item.Id, true);
+
+								lodash.remove(waiting, function(i) {
+									return i.Id == v.item.Id;
+								});
+								lodash.remove(queueswap, function(i) {
+									return i.Id == v.item.Id;
+								});
+								//console.log("Size Failed For Item more than 20 times, removed from queue.");
+							}
+
+							console.log('Update size failed. Leaving out of queue. ');
 						}
-
-						console.log("Update size failed. Leaving out of queue. ")
-					}
-				}).catch((err)=>
-				{
-					processedstats.skipped++;
-					console.log("updateSize failed: "+err);
-				});
+					})
+					.catch((err) => {
+						processedstats.skipped++;
+						console.log('updateSize failed: ' + err);
+					});
 			}
 		}
 	}
 
 	sizequeue = queueswap;
 
-	if (sizequeue.length > 0)
-	{
+	if (sizequeue.length > 0) {
 		// continue processing.
 		setTimeout(() => {
-			sizecall(true);	
+			sizecall(true);
 		}, 5000);
+	} else {
+		sizerunning = false;
 	}
-	else
+}
+
+async function sizetimecall() 
+{
+
+	var items = await itemstore.getNext100WaitingSize(config.userid)
+
+	if (items.length == 0) {
+		console.log('==============> No more items in size update queue, ending timer <==========') 
+		sizerunning = false;
+		return;
+	}
+	else {sizerunning = true;}
+
+
+	while (items.length > 0)
 	{
+		var item = items.shift()
+
+		updateSize(item)
+		.then((v) => 
+		{
+			if (v.Success) 
+			{
+					console.log('Size Updated.');
+					console.log(v.item.SizeOnServer);
+			} else {
+				processedstats.skipped++;
+				//	itemstore.IncrementSizeFailure(v.item.Id)
+
+				if (v.item.SizeUpdateFailureCount > 20) {
+					itemstore.updateProcessSize(v.item.Id, false);
+				}
+
+				console.log('Update size failed. Leaving out of queue. ');
+			}
+		})
+		.catch((err) => {
+			processedstats.skipped++;
+			console.log('updateSize failed: ' + err);
+		});
+	}
+
+	if (sizerunning) {
+		// continue processing.
+		setTimeout(() => {
+			sizetimecall();
+		}, 5000);
+	} else {
+		console.log("================> QUEUE PROCESSED ENDING SIZE UPDATE JOB <============")
 		sizerunning = false;
 	}
 }
@@ -764,18 +808,14 @@ async function timecall() {
 	var queueswap = [];
 
 	// try to grab another 100 items waiting.
-	if (pipes.length+ waiting.length + sizequeue.length == 0) {
+	if (pipes.length + waiting.length + sizequeue.length == 0) {
 		waiting = await itemstore.getNext100Waiting(config.curraccount.userid);
 
 		for (var i in waiting) {
-
 			if (waiting[i].SizeOnServer == -1) {
-
 				sizequeue.push(waiting[i]);
-				sizecall();	
-			} 
-			else 
-			{
+				sizecall();
+			} else {
 				// if size is defined, download is ready to go.
 				queueswap.push(waiting[i]);
 			}
@@ -800,12 +840,12 @@ async function timecall() {
 
 	var message = '';
 
-	var waitingcount = await itemstore.getCountWaiting(config.curraccount.userid) - pipes.length;
+	var waitingcount = (await itemstore.getCountWaiting(config.curraccount.userid)) - pipes.length;
 	var inmemqueue = waiting.length;
 	var inmemsize = sizequeue.length;
 
 	message += 'Active Pipes: ' + pipes.length + '  In DB Waiting: ' + waitingcount + '\n';
-	message += 'Waiting in Mem: '+inmemqueue+"  Size Queue Size: "+inmemsize+'\n';
+	message += 'Waiting in Mem: ' + inmemqueue + '  Size Queue Size: ' + inmemsize + '\n';
 
 	for (var i in pipes) {
 		var rate = 0;
@@ -842,7 +882,7 @@ async function timecall() {
 
 	console.log(message);
 
-	if (waiting.length == 0 && pipes.length == 0 && sizequeue.length ==0) {
+	if (waiting.length == 0 && pipes.length == 0 && sizequeue.length == 0) {
 		console.log('stopping timer');
 	} else {
 		setTimeout(() => {
@@ -870,6 +910,18 @@ function recursepath(path) {
 	return files;
 }
 
+async function sleep(ms)
+{	
+	var end = Date.now()+ms
+
+	var i = 0
+
+	while (Date.now() < end) 
+	{
+		
+	}
+}
+
 //FINISHED
 async function getPhotoItem(id, maxretries = 5) {
 	var retry = true;
@@ -879,6 +931,9 @@ async function getPhotoItem(id, maxretries = 5) {
 
 	while (retry && retries < maxretries + 1) {
 		retry = false;
+
+		// 11 items per second
+		await sleep(1000/5)
 
 		if (retries > 0) {
 			console.log('GetItem failed, Retry ' + retries + ' of ' + maxretries);
@@ -1011,8 +1066,6 @@ async function FillInitialQueueFromServer() {
 
 	var res = await itemstore.setWaitTillNextFromQueue(config.curraccount.userid);
 
-	
-
 	console.log('Found ' + totalitemcount + ' Items.');
 	return totalitemcount;
 }
@@ -1081,31 +1134,27 @@ function createUser() {
 		var userfound = findUser();
 
 		if (!userfound) {
+			console.log('ADDED NEW USER TO ACCOUNTS ! UPDATE THE DIRECTORIES ACCORDINGLY AND RELOAD THIS PROGRAM !');
 
-			console.log("ADDED NEW USER TO ACCOUNTS ! UPDATE THE DIRECTORIES ACCORDINGLY AND RELOAD THIS PROGRAM !");
-			
 			var acc = new GoogleAccount(
 				config.userid,
 				config.username,
 				config.emailid,
 				'Google User',
 				config.defaultlocaldir,
-				config.defaultpulldir+'/'+ config.username+ '/'+config.defaultonserverdir,
-				config.defaultpulldir + '/'+config.username
+				config.defaultpulldir + '/' + config.username + '/' + config.defaultonserverdir,
+				config.defaultpulldir + '/' + config.username
 			);
 
 			acc.InsertInDb(universaldb);
 
+			console.log('CREATING DIRECTORY STRUCTURE');
 
-			console.log("CREATING DIRECTORY STRUCTURE");
-
-			if (!fs.existsSync(acc.destdir))
-			{
+			if (!fs.existsSync(acc.destdir)) {
 				fs.mkdirSync(acc.destdir);
 			}
 
-			if (!fs.existsSync(acc.onserverdirectory))
-			{
+			if (!fs.existsSync(acc.onserverdirectory)) {
 				fs.mkdirSync(acc.onserverdirectory);
 			}
 
@@ -1127,8 +1176,7 @@ function writeUserStore() {
 }
 
 async function loadUserStore() {
-
-	accounts = await GoogleAccount.GetAll()
+	accounts = await GoogleAccount.GetAll(universaldb);
 	// this has been moved to sqlite database storage
 	// if (!fs.existsSync('accountstores.json')) {
 	// 	writeUserStore();
@@ -1201,4 +1249,3 @@ function backupFile(filename) {
 
 	console.log('Backed up: ' + filename + ' to backup file: ' + d1);
 }
-
