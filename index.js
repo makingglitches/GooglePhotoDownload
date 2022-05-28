@@ -49,7 +49,11 @@ var processedstats = {
 
 
 //loadandsortStored();
-loadUserStore();
+loadUserStore().then((val) =>
+{
+	console.log("Accounts Loaded.")
+});
+
 //backupFile('itemstore.json');
 //backupFile('accountstores.json');
 
@@ -1122,7 +1126,9 @@ function writeUserStore() {
 	// fs.writeFileSync('accountstores.json', JSON.stringify(accounts));
 }
 
-function loadUserStore() {
+async function loadUserStore() {
+
+	accounts = await GoogleAccount.GetAll()
 	// this has been moved to sqlite database storage
 	// if (!fs.existsSync('accountstores.json')) {
 	// 	writeUserStore();

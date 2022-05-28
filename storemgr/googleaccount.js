@@ -16,7 +16,14 @@ class GoogleAccount
 {
     static  FromRow(row)
     {
-        return new GoogleAccount();
+        return new GoogleAccount(
+            row.UserId,
+            row.Name,
+            row.EmailId,
+            'Google Account',
+            row.LocalDir,
+            row.OnServerDir, 
+            row.StoreDirectory);
     }
 
     static async CheckExistsDb(db,userid)

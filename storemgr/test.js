@@ -10,6 +10,9 @@ const sql = require('sqlite3').verbose();
     
 var db = new sql.Database('./storemgr/test.sqlite');
 
+
+var accs = await GoogleAccount.GetAll(db);
+
 var g = new GoogleAccount(87,1,1,1,1,1,1)
 
 var res = await g.InsertInDb(db)
