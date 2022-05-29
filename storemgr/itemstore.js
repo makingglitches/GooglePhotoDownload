@@ -418,6 +418,15 @@ async function updateProcessSize(id,process)
 	return res.success;
 }
 
+async function getStoreFolders()
+{
+	var sql = 'select * from ImageDirectories'
+
+	var res = await getrows(db,sql)
+
+	return res.success ? res.rows : null
+}
+
 module.exports = {
 	InitDB: InitDB,
 	MarkFinished: MarkFinished,
@@ -451,5 +460,6 @@ module.exports = {
 	ClearSizeFailureCount: ClearSizeFailureCount,
 	getMissingSizeCount: getMissingSizeCount,
 	getNext100WaitingSize: getNext100WaitingSize,
-	updateProcessSize:updateProcessSize
+	updateProcessSize:updateProcessSize,
+	getStoreFolders: getStoreFolders
 };
