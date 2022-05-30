@@ -179,6 +179,29 @@ var items=[];
             
         });
 
+        $('#processHashes').click(function()
+        {
+            $.ajax(
+                {
+                    type: 'GET',
+                    url: '/processhashes',
+                    dataType: 'json',
+                    data: {},
+                    success: (data) =>
+                    {
+                        console.log('completed hash computation.')
+                    },
+                    error: (jq,tx,err) =>
+                    {
+                        console.log("threw an error ");
+                        console.log(tx);
+                        console.log(err);
+                    }        
+                }
+                );
+            
+        });
+
         $('#clearsizefail').click(function()
         {
             $.ajax(
@@ -228,6 +251,7 @@ var items=[];
     <a id="clearsizefail" href="javascript:void(0)">Click to clear size update failures.</a><br>
     <a id="forcerefresh" href="javascript:void(0)">Force refresh of access token</a><br>
     <a id="refreshsizes" href="javascript:void(0)">Force size update</a><br>
+    <a id="processHashes" href="javascript:void(0)">Process All Uncomputed Hashes</a><br>
     <a id="upload" href="javascript:void(0)">Test Upload</a><br>
     <a id="userinst" href="javascript:void(0)">GetUserInstanceData</a><br>
 </body>

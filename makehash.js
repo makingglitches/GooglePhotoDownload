@@ -1,7 +1,8 @@
 const crypto = require('crypto')
 const fs = require('fs')
 const { fasttest } = require('./config')
-
+const path = require('path')
+const itemstore = require('./storemgr/itemstore')
 
 function createSha256(plainstring)
 {
@@ -12,6 +13,28 @@ function createSha256(plainstring)
     return h.digest('base64')
 }
 
+
+async function HashItem(db,storeitem, location)
+{
+
+    try 
+    {
+    itemstore.InitDB(db);
+
+    var filename = path.join(location,storeitem.FileNameOnServer);
+
+    var digest = createSha256FromFile(filename)
+
+    var succ = await itemstore.setHash(storeitem.Id, digest);
+
+    return {success:succ, item:storeitem,location:location, hash:digest, err: null};
+    }
+    catch (err)
+    {
+        return {success:false, item:storeitem, location:location, hash:null, err:err }
+    }
+
+}
 
 function createSha256FromFile(filename)
 {
@@ -47,6 +70,7 @@ function createSha256FromFile(filename)
 
 module.exports = 
 {
+    HashItem,HashItem,
     CreateSha256: createSha256,
     CreateSha256FromFile: createSha256FromFile
 }

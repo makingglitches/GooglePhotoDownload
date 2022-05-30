@@ -93,10 +93,13 @@ const { json } = require('express');
 const { WSAENOTSOCK } = require('constants');
 const { exception } = require('console');
 const { CONNREFUSED } = require('dns');
-const { debounce, size } = require('lodash');
+const { debounce, size, isNull } = require('lodash');
 const itemstore = require('./storemgr/itemstore');
 const { UpdateSize } = require('./storemgr/itemstore');
 const GoogleAccount = require('./storemgr/googleaccount.js');
+const makehash = require('./makehash.js');
+const getrows = require('./storemgr/getRows.js');
+const { hasUncaughtExceptionCaptureCallback } = require('process');
 
 var universaldb = OpenDatabase();
 itemstore.InitDB(universaldb);
@@ -232,6 +235,49 @@ app.get('/clearsizefail', async (req, res) => {
 function acallback(arg1, arg2, arg3, arg4) {
 	console.log('reached auth callback');
 }
+
+
+
+
+async function grabNextHashQueue()
+{
+	console.log("Retrieving all storeitems with unprocessed hashes.");
+
+	var sql = 'select * from storeitem where DownloadedSha256 is null and userid=? and DownloadMissingLocal <> 1 limit ?'
+
+	var r = await getrows(universaldb,sql,[config.userid,100]);
+
+	var missing = 0;
+
+	r.rows.forEach(element => {
+
+		var filename = path.join(config.curraccount.destdir,element.FileNameOnServer);
+
+		if (fs.existsSync(filename))
+		{
+			hashqueue.push(element)
+		}
+		else
+		{
+			missing++;
+			itemstore.MarkMissingLocal(element.Id)
+		}
+	});
+} 
+
+app.get('/processhashes', async(req,res) =>
+{
+
+	if (hashrunning)
+	{
+		console.log("A hash job is already running. please wait till finished.");
+		
+	}
+	else
+	{
+		processHashes();
+	}
+});
 
 app.get('/upload', async (req, res) => {
 	testUpload('./images.jpeg');
@@ -587,6 +633,9 @@ async function startJob(destfilename, storeitem) {
 
 			// clear from queue.
 			await itemstore.MarkWaitTillNext(this.storeitem.Id, false);
+
+			if (!hashrunning) {  processHashes();}
+
 		} else {
 			console.log('Request promise sent error.');
 		}
@@ -891,6 +940,75 @@ async function timecall() {
 	}
 
 	console.log(processedstats);
+}
+
+
+var hashqueue = []
+var hashjobs = 0
+const hashjoblimit = 15;
+var hashrunning = false;
+var hashcall = null;
+
+async function processHashes() {
+
+	if (hashqueue.length < hashjoblimit)
+	{
+		await grabNextHashQueue();
+	}
+
+	// start and limit the number of concurrent hash jobs
+	while (hashqueue.length > 0  && hashjobs < hashjoblimit)
+	{
+		var item = hashqueue.shift();
+
+		hashjobs++;
+
+		console.log("Processing Hash for :" + item.FileNameOnServer);
+
+		makehash.HashItem(universaldb,item,config.curraccount.destdir).then( 
+			(val) => 
+			{
+				if ( val.success)
+				{
+					hashjobs--;
+					console.log("Computed and stored hash for "+val.item.FileNameOnServer);
+					console.log("Value: "+val.hash);
+				}
+				else
+				{
+					hashjobs--;
+					console.log("Failed to compute hash for: "+val.item.FileNameOnServer);
+					console.log("With error: "+val.err);
+				}
+
+				if (hashcall)
+				{
+					//TODO: try to figure out how to cancel timeout delay.
+				}
+			});
+	}
+
+	// gonna grab everything marked not missing and unprocessed.
+	// this will get started even while downloading so.. ya. fun fun.
+
+	if (hashqueue.length < hashjoblimit) {  grabNextHashQueue();}
+
+	if (hashqueue.length > 0)
+	{
+		hashrunning = true;
+		hashcall =  setTimeout(() => {
+			processHashes();
+		}, (1000));
+
+		
+	}
+	else
+	{		
+		hashrunning = false;
+		console.log("Hashing timer stopped, no more jobs.");
+	}
+
+
 }
 
 // FINISHED

@@ -357,6 +357,16 @@ async function createNewStoreItemsFromQueue(userid) {
 	return res.success;
 }
 
+
+async function setHash(id, hash)
+{
+	var sql = 'update StoreItem set DownloadedSha256 = ? where Id = ?'
+
+	var r = await getrows (db,sql,[hash,id]);
+
+	return r.success;
+}
+
 async function getCountWaiting(userid) {
 	var sql = 'select count(*) as waitingcount from StoreItem where userid=? and  SizeUpdateFailureCount <21 and waittillnext=1';
 
@@ -429,6 +439,7 @@ async function getStoreFolders()
 
 module.exports = {
 	InitDB: InitDB,
+	MarkMissingLocal: MarkMissingLocal,
 	MarkFinished: MarkFinished,
 	UpdateSize: UpdateSize,
 	SetVideoOption: SetVideoOption,
@@ -461,5 +472,6 @@ module.exports = {
 	getMissingSizeCount: getMissingSizeCount,
 	getNext100WaitingSize: getNext100WaitingSize,
 	updateProcessSize:updateProcessSize,
-	getStoreFolders: getStoreFolders
+	getStoreFolders: getStoreFolders,
+	setHash: setHash
 };
