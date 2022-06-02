@@ -20,10 +20,7 @@ class GoogleAccount
             row.UserId,
             row.Name,
             row.EmailId,
-            'Google Account',
-            row.LocalDir,
-            row.OnServerDir, 
-            row.StoreDirectory);
+            'Google Account');
     }
 
     static async CheckExistsDb(db,userid)
@@ -63,18 +60,12 @@ class GoogleAccount
     constructor(_userid=null, 
                 _username=null, 
                 _emailid=null, 
-                _title=null,
-                _localdir=null,
-                _onserverdir=null,
-                _destdir=null )
+                _title=null)
     {
         this.userid =  _userid;
         this.username=_username;
         this.emailid=_emailid;
         this.title =  'Google User';
-        this.localdirectory = _localdir;
-        this.onserverdirectory=  _onserverdir;
-        this.destdir = _destdir;
 
         this.UserExistsInDb = async function(db)
         {
@@ -96,17 +87,11 @@ class GoogleAccount
            var res = await getrows(db ,` UPDATE Accounts
                     SET Name = ?,
                     EmailId = ?,
-                    LocalDir = ?,
-                    OnServerDir = ?,
-                    StoreDirectory = ?
                     WHERE
                     UserId = ?`,
                     [
                         this.username,
                         this.emailid,
-                        this.localdirectory,
-                        this.onserverdirectory,
-                        this.destdir,
                         this.userid]);
 
             return res.success;
@@ -122,14 +107,8 @@ class GoogleAccount
                 Name,
                 EmailId,
                 UserId,
-                LocalDir,
-                OnServerDir,
-                StoreDirectory
-            )
+           )
             VALUES (
-                ?,
-                ?,
-                ?,
                 ?,
                 ?,
                 ?
@@ -137,10 +116,7 @@ class GoogleAccount
             [
                 this.username,
                 this.emailid,
-                this.userid,
-                this.localdirectory,
-                this.onserverdirectory,
-                this.destdir
+                this.userid
             ]);
 
             return res.success;
