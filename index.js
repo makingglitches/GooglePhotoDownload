@@ -1310,21 +1310,8 @@ function createUser() {
 	return null;
 }
 
-function writeUserStore() {
-	// this has been moved to sqlite database storage.
-	// createUser();
-	// fs.writeFileSync('accountstores.json', JSON.stringify(accounts));
-}
-
 async function loadUserStore() {
 	accounts = await GoogleAccount.GetAll(universaldb);
-	// this has been moved to sqlite database storage
-	// if (!fs.existsSync('accountstores.json')) {
-	// 	writeUserStore();
-	// } else {
-	// 	accounts = JSON.parse(fs.readFileSync('accountstores.json'));
-	// 	writeUserStore();
-	// }
 }
 
 // this doesn't seem possible without verifying the stupid app
@@ -1377,16 +1364,3 @@ async function loadUserStore() {
 
 // 	bytesreq.end();
 // }
-
-function backupFile(filename) {
-	var dir = path.dirname(filename);
-	var fn = path.basename(filename);
-	var ext = path.extname(filename);
-	var ds = Date.now();
-
-	var d1 = dir + path.sep + fn + '-backup-' + ds + ext;
-
-	fs.copyFileSync(filename, d1);
-
-	console.log('Backed up: ' + filename + ' to backup file: ' + d1);
-}
