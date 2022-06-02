@@ -9,11 +9,15 @@
 //     destdir: config.defaultpulldir + '/'+config.username
 // };
 
+const { retry, findSeries } = require("async");
 const getrows = require("./getRows");
+const fs = require('fs')
 
 
 class GoogleAccount  
 {
+    static DirectoryType = { Download:1, Original:2, OnServer:3}
+
     static  FromRow(row)
     {
         return new GoogleAccount(
@@ -49,7 +53,8 @@ class GoogleAccount
         if (res.success)
         {
              res.rows.forEach(element => {
-                accounts.push(GoogleAccount.FromRow(element));        
+                accounts.push(GoogleAccount.FromRow(element));      
+                accounts[accounts.length -1].GetDirectories(db);  
             });
         }
 
@@ -66,6 +71,50 @@ class GoogleAccount
         this.username=_username;
         this.emailid=_emailid;
         this.title =  'Google User';
+        this.directores = []
+
+        // returns the FIRST download directory in the list.
+        this.localdir = function()
+        {
+            for (var i in this.directores)
+            {
+                if (this.directores[i].TrustedStore)
+                {
+                    return this.directores[i];
+                }
+            }
+
+            return null;
+
+        }
+
+        // returns the FIRST server only directory in the list
+        this.onserverdirectory = function()
+        {
+            for (var i in this.directores)
+            {
+                if (this.directores[i].ServerOnlyOrganizer)
+                {
+                    return this.directores[i];
+                }
+            }
+
+            return null;
+        }
+
+        this.originalsdirectory = function()
+        {
+            for (var i in this.directores)
+            {
+                if (this.directores[i].OriginalStore)
+                {
+                    return this.directores[i];
+                }
+            }
+
+            return null;
+
+        }
 
         this.UserExistsInDb = async function(db)
         {
@@ -97,6 +146,55 @@ class GoogleAccount
             return res.success;
         }
 
+        this.GetDirectories = async function (db)
+        {
+            var sql = 'select * from ImageDirectories where UserId=? or not UserSpecific and Active'
+
+            var res = await getrows(db, sql, [this.userid]);
+
+            var startdirs =  res.success ? res.rows: [];
+            
+            this.directores = [];
+            
+            for (var i in startdirs)
+            {
+                // sometimes a directory is a mount point in linux.
+                if (fs.existsSync(startdirs[i].Directory))
+                {
+                    this.directores.push(startdirs[i])
+                }
+            }
+
+            return res.rows;
+        }
+
+        this.AddDirectory = async function (db, dirname, title, directorytype  )
+        {
+            var sql = 
+            `insert or ignore into  ImageDirectories(Directory, Name, 
+                Active, TrustedStore, OriginalStore,  
+                ServerOnlyOrganizer, UserSpecific, UserId)
+            values ( ?, ? , ? , ? , ? , ?, ?, ? )`
+
+            var res = await getrows(db,
+                     sql,
+                     [
+                        dirname, 
+                        title, 
+                        true, 
+                        directorytype == GoogleAccount.DirectoryType.Download,
+                        directorytype == GoogleAccount.DirectoryType.Original,
+                        directorytype == GoogleAccount.DirectoryType.OnServer,
+                        true,
+                        this.userid
+                    ] );
+
+
+            this.GetDirectories(db);
+
+            return res.success;
+        }
+
         this.InsertInDb = async function(db)
         {
 
@@ -106,13 +204,13 @@ class GoogleAccount
             var res = await getrows(db , `INSERT INTO Accounts (
                 Name,
                 EmailId,
-                UserId,
+                UserId
            )
             VALUES (
                 ?,
                 ?,
                 ?
-            );`,
+            )`,
             [
                 this.username,
                 this.emailid,

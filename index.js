@@ -251,7 +251,7 @@ async function grabNextHashQueue()
 
 	r.rows.forEach(element => {
 
-		var filename = path.join(config.curraccount.destdir,element.FileNameOnServer);
+		var filename = path.join(config.curraccount.localdir().Directory,element.FileNameOnServer);
 
 		if (fs.existsSync(filename))
 		{
@@ -320,7 +320,7 @@ app.get(
 		var userexists = await GoogleAccount.CheckExistsDb(universaldb, config.userid);
 
 		if (!userexists) {
-			createUser();
+			await createUser();
 		} else {
 			findUser();
 		}
@@ -351,7 +351,7 @@ function pushtoQueue(destfilename, storeitem) {
 
 async function CheckDownloads() {
 	// fuck them i did this before.
-	var files = recursepath(config.curraccount.destdir).map(function(v) {
+	var files = recursepath(config.curraccount.localdir().Directory).map(function(v) {
 		return path.basename(v);
 	});
 
@@ -361,14 +361,14 @@ async function CheckDownloads() {
 //FINISHED
 async function MoveOriginalsUpdateStore() {
 	// get the files locally stored, and recurse through these paths finding all video files
-	var paths = [ config.curraccount.onserverdirectory, config.curraccount.localdirectory ];
+	var paths = config.curraccount.directories;;
 	var files = [];
 
 	console.log('recursing local store');
 
 	// retrieve a list of local files.
 	for (var i in paths) {
-		files = files.concat(recursepath(paths[i]));
+		files = files.concat(recursepath(paths[i].Directory));
 	}
 
 	var onservercount = 0;
@@ -408,11 +408,11 @@ async function MoveOriginalsUpdateStore() {
 			var bname = path.basename(files[i]);
 
 			// move item to the onserver directory
-			moveItems(files[i], config.curraccount.onserverdirectory);
+			moveItems(files[i], config.curraccount.onserverdirectory());
 			onservercount++;
 
 			// update the file entry for the changed location
-			files[i] = path.join(config.curraccount.onserverdirectory, bname);
+			files[i] = path.join(config.curraccount.onserverdirectory(), bname);
 
 			// get the original's size
 			var stat = fs.statSync(files[i]);
@@ -420,7 +420,7 @@ async function MoveOriginalsUpdateStore() {
 			//		updatelist.push([ files[i], stat.size ]);
 
 			// the downloads filename.
-			var localdl = path.join(config.curraccount.destdir, bname);
+			var localdl = path.join(config.curraccount.localdir().Directory, bname);
 
 			// update the original size field if necessary
 			if (found.Obj.OriginalSize == null) {
@@ -464,7 +464,7 @@ async function MoveOriginalsUpdateStore() {
 				itemstore.MarkFinished(found.Obj.Id, false, 0, true);
 			}
 		} else {
-			moveItems(files[i], config.curraccount.localdirectory);
+			moveItems(files[i], config.curraccount.localdir().Directory);
 			localonlycount++;
 		}
 	}
@@ -879,7 +879,7 @@ async function timecall() {
 		if (started == googlegayasslimit) break;
 
 		var i = waiting.shift();
-		var job = await startJob(path.join(config.curraccount.destdir, i.FileNameOnServer), i);
+		var job = await startJob(path.join(config.curraccount.localdir().Directory, i.FileNameOnServer), i);
 
 		if (!job) {
 			console.log('Job Canceled.');
@@ -957,7 +957,7 @@ async function startHashJob(item)
 
 	console.log("Processing Hash for :" + item.FileNameOnServer);
 
-	makehash.HashItem(universaldb,item,config.curraccount.destdir).then( 
+	makehash.HashItem(universaldb,item,config.curraccount.localdir().Directory).then( 
 	async(val) => 
 	{
 		if ( val.success)
@@ -1270,7 +1270,7 @@ function findUser() {
 	return userfound;
 }
 
-function createUser() {
+async function createUser() {
 	if (config.userid) {
 		var userfound = findUser();
 
@@ -1282,22 +1282,36 @@ function createUser() {
 				config.username,
 				config.emailid,
 				'Google User',
-				config.defaultlocaldir,
-				config.defaultpulldir + '/' + config.username + '/' + config.defaultonserverdir,
-				config.defaultpulldir + '/' + config.username
 			);
 
-			acc.InsertInDb(universaldb);
+			var onserverdir = config.defaultpulldir + '/' + config.username + '/' + config.defaultonserverdir;
+			var destdir = config.defaultpulldir + '/' + config.username;
+
+			await acc.InsertInDb(universaldb);
+
+			// these won't be inserted if they already exist in db.
+			
+			await acc.AddDirectory(universaldb,destdir,
+				'Local Directory', 
+				GoogleAccount.DirectoryType.Download);
+
+			//TODO:  consider what happens if there is a shared on serverdirectory in a weird loc.
+			await acc.AddDirectory(universaldb,onserverdir,
+					'Local Directory', 
+					GoogleAccount.DirectoryType.OnServer);
+
 
 			console.log('CREATING DIRECTORY STRUCTURE');
 
-			if (!fs.existsSync(acc.destdir)) {
-				fs.mkdirSync(acc.destdir);
+			if (!fs.existsSync(destdir)) {
+				fs.mkdirSync(destdir);
 			}
 
-			if (!fs.existsSync(acc.onserverdirectory)) {
-				fs.mkdirSync(acc.onserverdirectory);
+			if (!fs.existsSync(onserverdir)) {
+				fs.mkdirSync(onserverdir);
 			}
+
+			await acc.GetDirectories(universaldb);
 
 			accounts.push(acc);
 
