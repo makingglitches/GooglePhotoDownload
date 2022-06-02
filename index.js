@@ -895,6 +895,7 @@ async function timecall() {
 
 	message += 'Active Pipes: ' + pipes.length + '  In DB Waiting: ' + waitingcount + '\n';
 	message += 'Waiting in Mem: ' + inmemqueue + '  Size Queue Size: ' + inmemsize + '\n';
+	message += "Hash Queue: "+hashqueue.length +" \n";
 
 	for (var i in pipes) {
 		var rate = 0;
@@ -949,9 +950,55 @@ const hashjoblimit = 15;
 var hashrunning = false;
 var hashcall = null;
 
+
+async function startHashJob(item)
+{
+	hashjobs++;
+
+	console.log("Processing Hash for :" + item.FileNameOnServer);
+
+	makehash.HashItem(universaldb,item,config.curraccount.destdir).then( 
+	async(val) => 
+	{
+		if ( val.success)
+		{
+			hashjobs--;
+			console.log("Computed and stored hash for "+val.item.FileNameOnServer);
+			console.log("Value: "+val.hash);
+		}
+		else
+		{
+			hashjobs--;
+			console.log("Failed to compute hash for: "+val.item.FileNameOnServer);
+			console.log("With error: "+val.err);
+		}
+		
+		if (hashjobs < hashjoblimit )
+		{
+			// maybe its an irrational fear, but the reason I don't just leapfrog off 
+			// method completion is the fear that this will silenlt error out and die
+			// like can happen with threads in other programming languages.
+			// yes it may be irrational.
+			if (hashqueue.length == 0)
+			{
+				await grabNextHashQueue();
+			}
+
+			if (hashqueue.length > 0)
+			{
+				var item = hashqueue.shift();
+
+				await startHashJob(item);
+			}
+		}
+		
+	});
+
+}
+
 async function processHashes() {
 
-	if (hashqueue.length < hashjoblimit)
+	if (hashqueue.length == 0)
 	{
 		await grabNextHashQueue();
 	}
@@ -961,37 +1008,14 @@ async function processHashes() {
 	{
 		var item = hashqueue.shift();
 
-		hashjobs++;
-
-		console.log("Processing Hash for :" + item.FileNameOnServer);
-
-		makehash.HashItem(universaldb,item,config.curraccount.destdir).then( 
-			(val) => 
-			{
-				if ( val.success)
-				{
-					hashjobs--;
-					console.log("Computed and stored hash for "+val.item.FileNameOnServer);
-					console.log("Value: "+val.hash);
-				}
-				else
-				{
-					hashjobs--;
-					console.log("Failed to compute hash for: "+val.item.FileNameOnServer);
-					console.log("With error: "+val.err);
-				}
-
-				if (hashcall)
-				{
-					//TODO: try to figure out how to cancel timeout delay.
-				}
-			});
+		await startHashJob(item);
+		
 	}
 
 	// gonna grab everything marked not missing and unprocessed.
 	// this will get started even while downloading so.. ya. fun fun.
 
-	if (hashqueue.length < hashjoblimit) {  grabNextHashQueue();}
+	if (hashqueue.length ==0 ) {  grabNextHashQueue();}
 
 	if (hashqueue.length > 0)
 	{
@@ -999,7 +1023,6 @@ async function processHashes() {
 		hashcall =  setTimeout(() => {
 			processHashes();
 		}, (1000));
-
 		
 	}
 	else
