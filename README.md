@@ -24,18 +24,4 @@ Also for sake of simply stating this, I think Node Js is the most horrific langu
 The more recent theft had to have occurred in Scranton, PA
 That's where I've been heading.
 
-All the files need recovered and handed over to the RIGHTFUL owner.
-That is all versions as well.
-ALL.
-
-
-Be dead on your own garbage time.
-Fucking rapist chomo whores.
-
-Oh by the way the pieces of shit at PeopleReady in Fort Collins need to return the hard drives they stole from inside the water proof sleeve I was using to protect MY FUCKING PHOTOS and DOCUMENTS years ago when they started kidnapping me, or they need their legs chopped off.
-
-They want 'orange' bs, they can have it.  Fucking dumbass stupid ruined fucking fucked up chomo chattle garbage.
-
-Seriously life is hard enough without people working so hard to labotomize the general public.
-
-Fucking morons. stop 'working'.
+Everything is wonderful all the time and this has all been truly worthwhile :) And everyone who thinks that is too smart for me.
