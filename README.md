@@ -37,3 +37,5 @@ Oh by the way the pieces of shit at PeopleReady in Fort Collins need to return t
 They want 'orange' bs, they can have it.  Fucking dumbass stupid ruined fucking fucked up chomo chattle garbage.
 
 Seriously life is hard enough without people working so hard to labotomize the general public.
+
+Fucking morons. stop 'working'.
