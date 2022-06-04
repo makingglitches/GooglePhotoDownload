@@ -29,3 +29,5 @@ That is all versions as well.
 ALL.
 
 
+Be dead on your own garbage time.
+Fucking rapist chomo whores.
