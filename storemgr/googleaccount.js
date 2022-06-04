@@ -52,10 +52,11 @@ class GoogleAccount
 
         if (res.success)
         {
-             res.rows.forEach(element => {
-                accounts.push(GoogleAccount.FromRow(element));      
-                accounts[accounts.length -1].GetDirectories(db);  
-            });
+            for (var i in res.rows)
+            {
+                accounts.push(GoogleAccount.FromRow(res.rows[i]));      
+                await accounts[accounts.length -1].GetDirectories(db);  
+            }
         }
 
         return accounts;
@@ -154,14 +155,14 @@ class GoogleAccount
 
             var startdirs =  res.success ? res.rows: [];
             
-            this.directores = [];
+            this.directories = [];
             
             for (var i in startdirs)
             {
                 // sometimes a directory is a mount point in linux.
                 if (fs.existsSync(startdirs[i].Directory))
                 {
-                    this.directores.push(startdirs[i])
+                    this.directories.push(startdirs[i])
                 }
             }
 
