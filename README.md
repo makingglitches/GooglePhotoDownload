@@ -31,3 +31,7 @@ ALL.
 
 Be dead on your own garbage time.
 Fucking rapist chomo whores.
+
+Oh by the way the pieces of shit at PeopleReady in Fort Collins need to return the hard drives they stole from inside the water proof sleeve I was using to protect MY FUCKING PHOTOS and DOCUMENTS years ago when they started kidnapping me, or they need their legs chopped off.
+
+They want 'orange' bs, they can have it.  Fucking dumbass stupid ruined fucking fucked up chomo chattle garbage.
