@@ -48,6 +48,16 @@
         {
             "type": "pwa-node",
             "request": "launch",
+            "name": "Search Local Store",
+            "skipFiles": [
+                "<node_internals>/**"
+            ],
+            "program": "${workspaceFolder}/searchLocal.js",
+            "console": "externalTerminal"
+        },
+        {
+            "type": "pwa-node",
+            "request": "launch",
             "name": "Migrate Item Store",
             "skipFiles": [
                 "<node_internals>/**"

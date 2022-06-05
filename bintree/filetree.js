@@ -1,4 +1,6 @@
-var keytree = require('./keytree')
+var keytree = require('./keytree').keytree
+var KeyResult = require('./keytree').KeyResult
+
 var path = require('path')
 
 function addFile(tree, file)

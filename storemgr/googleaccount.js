@@ -11,7 +11,8 @@
 
 const { retry, findSeries } = require("async");
 const getrows = require("./getRows");
-const fs = require('fs')
+const fs = require('fs');
+const mountPoint = require("mount-point");
 
 
 class GoogleAccount  
@@ -72,16 +73,18 @@ class GoogleAccount
         this.username=_username;
         this.emailid=_emailid;
         this.title =  'Google User';
-        this.directores = []
+        this.directories = []
+
+
 
         // returns the FIRST download directory in the list.
         this.localdir = function()
         {
-            for (var i in this.directores)
+            for (var i in this.directories)
             {
-                if (this.directores[i].TrustedStore)
+                if (this.directories[i].TrustedStore && this.directories[i].Main)
                 {
-                    return this.directores[i];
+                    return this.directories[i];
                 }
             }
 
@@ -92,28 +95,42 @@ class GoogleAccount
         // returns the FIRST server only directory in the list
         this.onserverdirectory = function()
         {
-            for (var i in this.directores)
+            for (var i in this.directories)
             {
-                if (this.directores[i].ServerOnlyOrganizer)
+                if (this.directories[i].ServerOnlyOrganizer && this.directories[i].Main)
                 {
-                    return this.directores[i];
+                    return this.directories[i];
                 }
             }
 
             return null;
         }
 
+
+        //TODO: THERE NEEEDS TO BE A METHOD TO GRAB AN ORIGINALS AND SERVERONLY DIRECTORY 
+        // THAT HAVE THE SAME MOUNT POINT
+        // OR THERE NEEDS TO BE A WAY TO INDICATE THAT CROSS DEVICE MOVES ARE OK
+        // EVEN IF THEY ARE EXTREMELY INEFFICIENT AND SLOW.
+        // this behavior was originally here so the user could decide whether originals 
+        // which had already been backed up should be deleted by giving them the leisure to look
+        // them over.
+        // the main idea was also to determine the efficiency of the google transcoding engine 
+        // for informative purposes by tracking the differences in file sizes
+        // apple and android phones both are HORRIBLE when it comes to file size bloat.
+
         this.originalsdirectory = function()
         {
-            for (var i in this.directores)
+            var ret = [];
+
+            for (var i in this.directories)
             {
-                if (this.directores[i].OriginalStore)
+                if (this.directories[i].OriginalStore)
                 {
-                    return this.directores[i];
+                    ret.push(this.directories[i]);
                 }
             }
 
-            return null;
+            return ret;
 
         }
 
@@ -169,13 +186,15 @@ class GoogleAccount
             return res.rows;
         }
 
-        this.AddDirectory = async function (db, dirname, title, directorytype  )
+        this.AddDirectory = async function (db, dirname, title, directorytype, main=false  )
         {
             var sql = 
             `insert or ignore into  ImageDirectories(Directory, Name, 
                 Active, TrustedStore, OriginalStore,  
-                ServerOnlyOrganizer, UserSpecific, UserId)
-            values ( ?, ? , ? , ? , ? , ?, ?, ? )`
+                ServerOnlyOrganizer, UserSpecific, UserId, Main,MountPoint)
+            values ( ?, ? , ? , ? , ? , ?, ?, ?, ?, ? )`
+
+            var mp = await mountPoint(dirname);
 
             var res = await getrows(db,
                      sql,
@@ -187,7 +206,9 @@ class GoogleAccount
                         directorytype == GoogleAccount.DirectoryType.Original,
                         directorytype == GoogleAccount.DirectoryType.OnServer,
                         true,
-                        this.userid
+                        this.userid,
+                        main,
+                        mp            
                     ] );
 
 

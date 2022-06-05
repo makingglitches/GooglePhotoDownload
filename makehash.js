@@ -14,7 +14,7 @@ function createSha256(plainstring)
 }
 
 
-async function HashItem(db,storeitem, location)
+async function HashItem(db,storeitem, location, original = false)
 {
 
     try 
@@ -25,7 +25,8 @@ async function HashItem(db,storeitem, location)
 
     var digest = createSha256FromFile(filename)
 
-    var succ = await itemstore.setHash(storeitem.Id, digest);
+    var  succ = await itemstore.setHash(storeitem.Id, digest, original);
+    
 
     return {success:succ, item:storeitem,location:location, hash:digest, err: null};
     }

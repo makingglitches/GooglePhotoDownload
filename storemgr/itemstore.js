@@ -358,9 +358,11 @@ async function createNewStoreItemsFromQueue(userid) {
 }
 
 
-async function setHash(id, hash)
+async function setHash(id, hash, original = false)
 {
-	var sql = 'update StoreItem set DownloadedSha256 = ? where Id = ?'
+	var sql = 'update StoreItem set ' + 
+	(original? "OriginalSha256":"DownloadedSha256") +
+	"= ? where Id = ?";
 
 	var r = await getrows (db,sql,[hash,id]);
 

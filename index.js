@@ -24,6 +24,8 @@ const KeyResult = kt.KeyResult;
 const sizeof = require('object-sizeof');
 const items = require('./storemgr/itemstore');
 const sql = require('sqlite3').verbose();
+const mountPoint = require('mount-point')
+
 
 var nodownload = false;
 
@@ -100,6 +102,7 @@ const GoogleAccount = require('./storemgr/googleaccount.js');
 const makehash = require('./makehash.js');
 const getrows = require('./storemgr/getRows.js');
 const { hasUncaughtExceptionCaptureCallback } = require('process');
+const { HashItem } = require('./makehash.js');
 
 var universaldb = OpenDatabase();
 itemstore.InitDB(universaldb);
@@ -360,15 +363,16 @@ async function CheckDownloads() {
 
 //FINISHED
 async function MoveOriginalsUpdateStore() {
-	// get the files locally stored, and recurse through these paths finding all video files
-	var paths = config.curraccount.directories;;
+	// get the originals stored in the originals  and server organizer directories.
+	var paths = config.curraccount.originalsdirectory().map(v=> v.Directory);
+
 	var files = [];
 
-	console.log('recursing local store');
+	console.log('recursing originals store');
 
 	// retrieve a list of local files.
 	for (var i in paths) {
-		files = files.concat(recursepath(paths[i].Directory));
+		files = files.concat(recursepath(paths[i]));
 	}
 
 	var onservercount = 0;
@@ -389,6 +393,7 @@ async function MoveOriginalsUpdateStore() {
 	// update the originalmissing field.
 	var res4 = await itemstore.UpdateMissingLocalByNames(itemnames, config.curraccount.userid);
 
+
 	for (var i in items) {
 		keytree.addToTree(serverfiletree, items[i].FileNameOnServer, items[i]);
 	}
@@ -398,7 +403,13 @@ async function MoveOriginalsUpdateStore() {
 
 	//	var updatelist = [];
 
+	// these don't do shit yet.
+	// var onservermntpoint = await mountPoint(config.curraccount.onserverdirectory().Directory);
+	// var destmntpoint = await mountPoint(config.curraccount.localdir().Directory);
+
 	for (var i in files) {
+
+		var filemntpnt = await mountPoint(files[i]);
 		// decide what to do with local files in the processing directories
 
 		var found = keytree.findInTree(serverfiletree, path.basename(files[i]));
@@ -408,7 +419,7 @@ async function MoveOriginalsUpdateStore() {
 			var bname = path.basename(files[i]);
 
 			// move item to the onserver directory
-			moveItems(files[i], config.curraccount.onserverdirectory());
+			await moveItems(files[i], config.curraccount.onserverdirectory());
 			onservercount++;
 
 			// update the file entry for the changed location
@@ -428,6 +439,17 @@ async function MoveOriginalsUpdateStore() {
 			}
 
 			var szupdated = false;
+
+			if (!found.Obj.OriginalSha256)
+			{
+				// TODO: MAKE SEPERATE THREAD FOR THIS LATER IF DETERMINED NECESSARY
+				var hash = await HashItem(universaldb, found.Obj, path.dirname(files[i]),true );
+			
+				if (hash.success)
+				{
+					console.log("Generated hash:"+  hash.hash);
+				}			
+			}
 
 			if (found.Obj.SizeOnServer == -1) {
 				szupdated = true;
@@ -464,7 +486,8 @@ async function MoveOriginalsUpdateStore() {
 				itemstore.MarkFinished(found.Obj.Id, false, 0, true);
 			}
 		} else {
-			moveItems(files[i], config.curraccount.localdir().Directory);
+		
+			await moveItems(files[i], config.curraccount.localdir().Directory);
 			localonlycount++;
 		}
 	}
@@ -1135,14 +1158,31 @@ var pairs = {};
 var stored = [];
 
 //finished
-function moveItems(file, dest) {
-	var newname = path.join(dest, path.basename(file));
+async function moveItems(file, dest) {
+	// discussed this with zimmerman 
+	// it never ceases to amaze me how this dumb shit is necessary
+	// bet i'll have to do another fucking async mod now.
+	// because node is fucking stupid.
 
-	if (file == newname) {
-		return;
+	var mntpntfile = await mountPoint(file);
+	var mntpntdest = await mountPoint(dest);
+
+	if (mntpntfile != mntpntdest)
+	{
+		fs.copyFileSync(file,dest);
+		fs.rmSync(file);
 	}
+	else
+	{
+		
+		var newname = path.join(dest, path.basename(file));
 
-	fs.renameSync(file, newname);
+		if (file == newname) {
+			return;
+		}
+
+		fs.renameSync(file, newname);
+	}
 
 	console.log('Moved ' + path.basename(file));
 }
@@ -1293,12 +1333,12 @@ async function createUser() {
 			
 			await acc.AddDirectory(universaldb,destdir,
 				'Local Directory', 
-				GoogleAccount.DirectoryType.Download);
+				GoogleAccount.DirectoryType.Download, true);
 
 			//TODO:  consider what happens if there is a shared on serverdirectory in a weird loc.
 			await acc.AddDirectory(universaldb,onserverdir,
 					'Local Directory', 
-					GoogleAccount.DirectoryType.OnServer);
+					GoogleAccount.DirectoryType.OnServer, true);
 
 
 			console.log('CREATING DIRECTORY STRUCTURE');

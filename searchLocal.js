@@ -88,10 +88,18 @@ async function main()
 				{
 					filetree.addFile(ft,files[fi])
 				}
+				
+				console.log("Updated FileTree")
 			}
 			
 		}
 
+		// todo: maybe consider leaving downloadmissinglocal out and 
+		// and reprocessing the whole tree ?
+		// and prompting here  instead for what the user wants to do ?
+		// here is where the new table indicating file locations should be included
+		// as well as hash processing for matches that have a local or original hash
+		// for sha256 set !
 		var sql = `select * from  StoreItem 
 		WHERE userid = ?
 		and SizeOnServer is not null
@@ -103,6 +111,21 @@ async function main()
 		var res = {}
 		var offset = 0
 
+		// no items in tree to match.
+		// should probably update some things.
+		// also what if the mount point is disconnected during this session ?
+		// TODO: check index.js for reset of downloadmissinglocal = 1 when mount point is
+		// is disconnected.
+		// this could be a bit of an issue and should be configurable !
+		// probably shouldn't be able to be reset so easily without a prompt !
+		// for now just skipping.
+		// and only looking at missing ones. seemingly.
+		// TODO: SHOULD ADD MESSAGE "Mount point: '' seems to be disconnected, mark downloads as missing ?"
+		if (!ft.categories)
+		{
+			continue;
+		}
+
 		do 
 		{
 			res = await getrows (universaldb, sql, [curruser.userid, offset])
@@ -111,7 +134,14 @@ async function main()
 
 			for (var r in res.rows)
 			{
+				var currrow = res.rows[r];
 
+				var f = filetree.findFile(ft, currrow.FileNameOnServer);
+
+				if (f.Found)
+				{
+					console.log('Found');
+				}
 			}
 
 		}
