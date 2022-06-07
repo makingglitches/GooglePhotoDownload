@@ -68,10 +68,18 @@ function createSha256FromFile(filename)
 }
 
 
+function checkHash(hash, file)
+{
+    var hash2 = createSha256FromFile(file);
+
+    return hash2 == hash
+}
+
 
 module.exports = 
 {
     HashItem,HashItem,
     CreateSha256: createSha256,
-    CreateSha256FromFile: createSha256FromFile
+    CreateSha256FromFile: createSha256FromFile,
+    checkHash:checkHash
 }

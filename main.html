@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta http-equiv="content-type" content="text/html; charset=windows-1252">
+    <script type="text/javascript" src="jquery-3.6.0.js">
+    </script>
+
+    <script type="text/javascript">
+
+
+        const heighadj = 25;
+
+        function doresize() {
+            if ($('#AccountList')) {
+                $('#AccountList').height($(window).innerHeight()-heighadj);
+            }
+            if ($("#ContentArea")) {
+                $('#ContentArea').height($(window).innerHeight()-heighadj);
+            }
+
+            if ($("#ActivityContent"))
+            {
+                $('#ActivityContent').height(  $('#ContentArea').height() - $('#Tabs').height() );
+            }
+
+        }
+
+        $(window).resize((fn) => {
+            doresize();
+        });
+
+        $().ready(function () {
+            doresize();
+        });
+
+    </script>
+    <link rel="stylesheet" href="main.css">
+
+</head>
+
+<body>
+    <div style="display:flex;flex-direction: row;">
+        <div id="AccountList" style="width:200px;overflow: scroll;"> Accounts</div>
+
+        <div id ="ContentArea" style="flex-grow: 1;">
+
+            <div id="Activity" style="width:100%;">
+                <div id="Tabs" class="tabs">
+                    <span id="HashingTab" class="button">Hashing Thread</span>
+                    <span id="DownloadingTab" class="button">Download Thread</span>
+                    <span id="StatusTab" class="button">Status Messages</span>
+                    <span id="StatsTab" class="button">Statistics</span>
+                </div>
+                <div id="ActivityContent" style="width:100%;">
+                    <div id="HashingContent" class="content"> Hashing Thread </div>
+                    <div id="DownloadingContent" class="content hide"> Download Thread </div>
+                    <div id="StatusContent" class="content hide"> Status Window </div>
+                    <div id="StatisticsContent" class="content hide"> Statistics Window </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

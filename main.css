@@ -1,0 +1,27 @@
+span.button{
+    padding: 2px;
+    margin:5px;
+    
+}
+div.content{
+    width: 100%;
+    align-content: stretch;
+    padding: 5px;
+    overflow: scroll;
+    height:inherit;
+}
+
+div.content:hover::content{
+    background-color: blue;
+    color: red;
+}
+
+div.tabs{
+    border: 1px;
+    padding: 3px;
+    border-style: dashed;
+}
+
+.hide{
+    display:none
+}

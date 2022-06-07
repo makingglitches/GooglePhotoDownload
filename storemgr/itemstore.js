@@ -5,6 +5,7 @@ const sqlite3 = require('sqlite3').verbose();
 const { any } = require('async');
 const { create } = require('lodash');
 const path = require('path');
+const { query } = require('express');
 // itemstore object
 // {
 //     "id": "AAs_2xY0TPLdYdba-IcKQZVIy8JnzzxO9FrmyrvNY3m2jCD1nZS-ctJRdeYiZ3jHvjhJXdgOkbyTN8A3RfjOLAjPpHy8xJw2oA",
@@ -430,13 +431,40 @@ async function updateProcessSize(id,process)
 	return res.success;
 }
 
-async function getStoreFolders()
+async function getAllStoreFolders()
 {
 	var sql = 'select * from ImageDirectories'
 
 	var res = await getrows(db,sql)
 
 	return res.success ? res.rows : null
+}
+
+async function CreateStoreItemLocationIfMissing(storeitem, directory)
+{
+	var sql = 'select * from ImageDirectories where Directory = ?'
+
+	var res = await getrows(db, sql, [directory])
+
+	if (res.success && res.rows && res.rows.length == 1)
+	{
+
+		// itemlocation exists, check a few things.
+
+		var imagedir = res.rows[0];
+		
+		if (imagedir.userid)
+		{
+			
+		}
+
+	}
+	else
+	{
+		return new queryResult(false,null,'No ImageDirectory Item for '+directory)
+	}
+	
+
 }
 
 module.exports = {
@@ -474,6 +502,6 @@ module.exports = {
 	getMissingSizeCount: getMissingSizeCount,
 	getNext100WaitingSize: getNext100WaitingSize,
 	updateProcessSize:updateProcessSize,
-	getStoreFolders: getStoreFolders,
+	getAllStoreFolders: getAllStoreFolders,
 	setHash: setHash
 };
