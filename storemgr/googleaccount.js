@@ -194,7 +194,9 @@ class GoogleAccount
                 ServerOnlyOrganizer, UserSpecific, UserId, Main,MountPoint)
             values ( ?, ? , ? , ? , ? , ?, ?, ?, ?, ? )`
 
-            var mp = await mountPoint(dirname);
+            //TODO: ALSO BROKEN PENDING MOVEITEMS AND MOUNTPOINT SOLUTION
+            // FOR DEVICE LOCATION COMPARISON
+            var mp = null ; //await mountPoint(dirname);
 
             var res = await getrows(db,
                      sql,

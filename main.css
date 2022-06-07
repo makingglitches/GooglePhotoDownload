@@ -27,10 +27,25 @@ div.tabs{
     white-space:nowrap;
 }
 
+div.itemlist {
+    padding: 5px;
+    margin: 25px 5px 5px 5px;
+    
+}
+span.accounttitle {
+    border-bottom: 1px;
+    border-style: none none dashed none;
+    text-align: center;
+    vertical-align:middle;
+    padding: 5px;
+    margin: 10px;
+}
+
 div.accountlist{
     width:200px;
     overflow: scroll;
     white-space: nowrap;
+
 }
 
 .hide{

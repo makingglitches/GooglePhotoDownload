@@ -178,7 +178,9 @@ app.post('/redownloadstart', async (req, res) => {
 	nodownload = false;
 	processedstats.userid = config.userid;
 	var res1 = await CheckDownloads();
+	//TODO: FIX THIS ! RESULTS FROM UPDATE TO IMAGEDIRECTORIES
 	var totals = await MoveOriginalsUpdateStore();
+	
 	// resolve the problem where original size is less than that on server but the original is missing
 	var res2 = await itemstore.resolveMissingLocalSizeandDownload(config.curraccount.userid);
 
@@ -242,7 +244,7 @@ function acallback(arg1, arg2, arg3, arg4) {
 
 app.get('/getaccounts', async(req,res) =>
 {
-	res.send( json.stringify(accounts)).status(200);
+	res.send( JSON.stringify(accounts)).status(200);
 });
 
 
@@ -424,37 +426,49 @@ async function MoveOriginalsUpdateStore() {
 			var bname = path.basename(files[i]);
 
 			// move item to the onserver directory
-			await moveItems(files[i], config.curraccount.onserverdirectory());
+			//await moveItems(files[i], config.curraccount.onserverdirectory());
 			onservercount++;
 
 			// update the file entry for the changed location
-			files[i] = path.join(config.curraccount.onserverdirectory(), bname);
+			files[i] = path.join(config.curraccount.onserverdirectory().Directory, bname);
 
 			// get the original's size
-			var stat = fs.statSync(files[i]);
+			// TODO: THIS IS CAUSING PROBLEMS BECAUSE THE ITEM MOVE IS BROKEN 
+			// PRESENTLY AND THEREFORE NOT OCCURRING
+			// SO THIS WILL NEED FIXED.
+			//var stat = fs.statSync(files[i]);
 
 			//		updatelist.push([ files[i], stat.size ]);
 
 			// the downloads filename.
 			var localdl = path.join(config.curraccount.localdir().Directory, bname);
 
+			//TODO: FIX THIS, COMMENTED OUT BECAUSE STAT IS BROKEN BECAUSE
+			// IT EXPECTS A FILE LOCATION THAT HAS NOT BEEN UPDATED
+			// BECAUSE OF PRESENT DIFFICULTIES WITH MOVEITEMS
+			// ALSO, IN THE CASE OF THIS NEED TO ADD LOGIC TO MARK LOCATION OF
+			// ORIGINAL, AS IT MAY NOT BE IN SAID DIRECTORY. THOUGH IT SHOULD BE
+			// PERHAPS ALLOW PER DEVICE ONSERVER ORGANIZER SO CROSS DEVICE MOVES
+			// DON'T HAVE TO OCCUR.  ORIGINALS CAN TAKE A LOT OF SPACE.
 			// update the original size field if necessary
-			if (found.Obj.OriginalSize == null) {
-				itemstore.UpdateOriginalSizeIf(found.Obj.Id, stat.size);
-			}
+			// if (found.Obj.OriginalSize == null) {
+			// 	itemstore.UpdateOriginalSizeIf(found.Obj.Id, stat.size);
+			// }
 
 			var szupdated = false;
 
-			if (!found.Obj.OriginalSha256)
-			{
-				// TODO: MAKE SEPERATE THREAD FOR THIS LATER IF DETERMINED NECESSARY
-				var hash = await HashItem(universaldb, found.Obj, path.dirname(files[i]),true );
+
+			//TODO: AWAITING FIX OF OTHER ORIGINALS ORIENTED CODE.
+			// if (!found.Obj.OriginalSha256)
+			// {
+			// 	// TODO: MAKE SEPERATE THREAD FOR THIS LATER IF DETERMINED NECESSARY
+			// 	var hash = await HashItem(universaldb, found.Obj, path.dirname(files[i]),true );
 			
-				if (hash.success)
-				{
-					console.log("Generated hash:"+  hash.hash);
-				}			
-			}
+			// 	if (hash.success)
+			// 	{
+			// 		console.log("Generated hash:"+  hash.hash);
+			// 	}			
+			// }
 
 			if (found.Obj.SizeOnServer == -1) {
 				szupdated = true;
@@ -492,7 +506,7 @@ async function MoveOriginalsUpdateStore() {
 			}
 		} else {
 		
-			await moveItems(files[i], config.curraccount.localdir().Directory);
+			//await moveItems(files[i], config.curraccount.localdir().Directory);
 			localonlycount++;
 		}
 	}
@@ -1170,6 +1184,7 @@ async function moveItems(file, dest) {
 	// because node is fucking stupid.
 
 	var mntpntfile = await mountPoint(file);
+
 	var mntpntdest = await mountPoint(dest);
 
 	if (mntpntfile != mntpntdest)

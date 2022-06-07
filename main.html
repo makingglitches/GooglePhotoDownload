@@ -52,6 +52,8 @@
             }
         }
 
+        function
+
         $(window).resize((fn) => {
             doresize();
         });
@@ -68,7 +70,13 @@
 
 <body>
     <div style="display:flex;flex-direction: row;">
-        <div id="AccountList" class="accountlist" style="flex-shrink:0"> Accounts</div>
+        <div id="AccountList" class="accountlist" style="flex-shrink:0"> 
+            <span class="accounttitle">Accounts</span><br>
+
+            <div id="accountitems" class="itemlist">
+                <span id="noneloaded">No accounts loaded.</span>
+            </div>
+        </div>
 
         <div id ="ContentArea" style="flex-grow: 1;">
 
