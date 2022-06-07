@@ -26,11 +26,38 @@
 
         }
 
+        var areas = ["Hashing", "Downloading", "Status","Stats", "Settings"];
+
+        function makepieces()
+        {
+            for (var i in areas)
+            {
+                var code = "$('#"+areas[i]+"Tab').click(function() { doswitch('"+areas[i]+"')}); ";
+                eval(code);
+            }
+        }
+
+        function doswitch(area)
+        {
+            for (var i in areas)
+            {
+                if (areas[i] == area)
+                {
+                    $('#'+area+'Content').removeClass('hide');
+                }
+                else
+                {
+                    $('#'+areas[i]+"Content").addClass('hide');
+                }
+            }
+        }
+
         $(window).resize((fn) => {
             doresize();
         });
 
         $().ready(function () {
+            makepieces();
             doresize();
         });
 
@@ -51,12 +78,14 @@
                     <span id="DownloadingTab" class="button">Download Thread</span>
                     <span id="StatusTab" class="button">Status Messages</span>
                     <span id="StatsTab" class="button">Statistics</span>
+                    <span id="SettingsTab" class ="button">Account Settings</span>
                 </div>
                 <div id="ActivityContent" style="width:100%;">
                     <div id="HashingContent" class="content"> Hashing Thread </div>
                     <div id="DownloadingContent" class="content hide"> Download Thread </div>
                     <div id="StatusContent" class="content hide"> Status Window </div>
-                    <div id="StatisticsContent" class="content hide"> Statistics Window </div>
+                    <div id="StatsContent" class="content hide"> Statistics Window </div>
+                    <div id="SettingsContent" class = "content hide">Account Settings Window</div>
                 </div>
 
             </div>
