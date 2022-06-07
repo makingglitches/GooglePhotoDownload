@@ -240,6 +240,11 @@ function acallback(arg1, arg2, arg3, arg4) {
 }
 
 
+app.get('/getaccounts', async(req,res) =>
+{
+	res.send( json.stringify(accounts)).status(200);
+});
+
 
 
 async function grabNextHashQueue()

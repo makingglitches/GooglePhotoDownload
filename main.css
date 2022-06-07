@@ -24,6 +24,13 @@ div.tabs{
     padding-bottom: 10px;
     border-style: dashed;
     margin: 2px;
+    white-space:nowrap;
+}
+
+div.accountlist{
+    width:200px;
+    overflow: scroll;
+    white-space: nowrap;
 }
 
 .hide{
