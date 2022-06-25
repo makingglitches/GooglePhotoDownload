@@ -1,5 +1,9 @@
+const { retryable } = require('async');
+const { exec, execSync } = require('child_process');
 const fs = require('fs');
-
+const { startsWith, replace } = require('lodash');
+const lodash = require('lodash');
+const { dirname } = require('path');
 
 class MountInfo
 {
@@ -13,7 +17,29 @@ class MountInfo
 
     static WhichDevice(file)
     {
+        var pathname = dirname(file)
 
+        // basically keeps testing the string until the currently mounted filesystems 
+        // are all tested and the one with the longest path is where the file will be under
+        // then return the object.
+        var plen = 0
+        var themnt = null
+
+        for (var i in MountInfo.Mounts)
+        {
+            var m = MountInfo.Mounts[i];
+         
+            if (startsWith(pathname,  m.MountPoint))
+            {
+                if (plen < m.MountPoint.length)
+                {
+                    plen = m.MountPoint.length;
+                    themnt = m;
+                }
+            }
+        }
+        
+        return themnt
     }
 
     constructor(entry)
@@ -24,7 +50,35 @@ class MountInfo
         this.Options = entry[3];
         this.DumpOption = entry[4];
         this.MountOrder= entry[5];
+        this.UUID ="";
+        this.LABEL="";
 
+        // have yet to see a linux installation that doesn't use the /dev directory
+        // to contain block devices. all image files will also be here as loop devices.
+        if (startsWith(this.Device,'/dev'))
+        {
+            var retval = execSync('blkid '+this.Device).toString().split(" ")
+
+            for (var i in retval)
+            {
+                var s = retval[i].replaceAll("\"","").trim()
+
+                if (s.indexOf("=") > -1 )
+                {
+                    var item = s.split("=")
+
+                    if (item[0]=="LABEL")
+                    {
+                        this.LABEL = item[1]
+                    }
+                    else if (item[0]=="UUID")
+                    {
+                        this.UUID = item[1]
+                    }
+                }
+
+            }
+        }
         this.ContainsPath = function(pathitem)
         {
             // ok john you're half asleep
