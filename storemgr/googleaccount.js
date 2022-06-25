@@ -12,7 +12,6 @@
 const { retry, findSeries } = require("async");
 const getrows = require("./getRows");
 const fs = require('fs');
-const mountPoint = require("mount-point");
 
 
 class GoogleAccount  

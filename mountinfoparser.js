@@ -96,19 +96,12 @@ function FSMounts() {
 		var entry = p[i].split(' ');
 
 		for (var r in entry) {
+            // replace space characters.
 			toentry.push(entry[r].replaceAll('\\040', ' '));
 		}
 
         var mp = new MountInfo(toentry)
 		mounts.push(mp);
-
-        for (var m in mounts)
-        {
-            if (mounts[m] != mp )
-            {
-                mp.ContainsPath(mounts[m].MountPoint);
-            }
-        }
 	}
 
     return mounts;

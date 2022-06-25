@@ -12,12 +12,13 @@
 // and stop infesting this world.
 // by now if i was one of these people i'd kill myself.
 // maybe they should start considering this option.
-const GoogleAccount = require("./storemgr/googleaccount");
-const filetree = require('./bintree/filetree');
+const GoogleAccount = require("../storemgr/googleaccount");
+const filetree = require('../bintree/filetree');
 const fs = require('fs')
 const sql = require('sqlite3').verbose();
-const itemstore = require('./storemgr/itemstore');
-const getrows = require("./storemgr/getRows");
+const itemstore = require('../storemgr/itemstore');
+const getrows = require("../storemgr/getRows");
+const { MountInfo } = require("../mountinfoparser");
 
 function recursepath(path) {
 	var files = [];
@@ -36,10 +37,10 @@ function recursepath(path) {
 }
 
 function OpenDatabase() {
-	console.log("Item Store database doesn't exist, creating.");
 
-	if (!fs.existsSync('./ItemStore.sqlite')) {
-		fs.copyFileSync('EmptyStoreDB.sqlite', 'ItemStore.sqlite');
+	if (!fs.existsSync('../ItemStore.sqlite')) {
+		console.log("Item Store database doesn't exist, creating.");
+		fs.copyFileSync('../EmptyStoreDB.sqlite', '../ItemStore.sqlite');
 	}
 
 	var db = new sql.Database('ItemStore.sqlite');
@@ -50,22 +51,20 @@ function OpenDatabase() {
 async function main()
 {
 
+	// populate mountinfo structure
+	MountInfo.ParseMounts();
+
 	/// #################### Main #######################
 	var universaldb = OpenDatabase();
 	itemstore.InitDB(universaldb);
 
 	var users = await GoogleAccount.GetAll(universaldb)
 
-
+	// build a tree from ALL user files on disks
 	for (var i in users)
-	{
+	{	
 		var ft = {};
-		var curruser = users[i]
-
-
-		console.log("Processing User: "+curruser.username)
-
-	//	await users[i].getDirectories(universaldb);
+		var curruser = users[i];
 
 		for (var f in curruser.directories)
 		{
@@ -93,41 +92,31 @@ async function main()
 			}
 			
 		}
+	}
 
-		// todo: maybe consider leaving downloadmissinglocal out and 
-		// and reprocessing the whole tree ?
-		// and prompting here  instead for what the user wants to do ?
-		// here is where the new table indicating file locations should be included
-		// as well as hash processing for matches that have a local or original hash
-		// for sha256 set !
+	// use file tree to compare against database contents.
+
+
+	for (var i in users)
+	{
+		var curruser = users[i]
+
+
+		console.log("Processing User: "+curruser.username)
+
 		var sql = `select * from  StoreItem 
 		WHERE userid = ?
 		and SizeOnServer is not null
 		and SizeOnServer > 0
-		and DownLoadMissingLocal = 1
 		limit 100 offset ?
 		`
 
 		var res = {}
 		var offset = 0
 
-		// no items in tree to match.
-		// should probably update some things.
-		// also what if the mount point is disconnected during this session ?
-		// TODO: check index.js for reset of downloadmissinglocal = 1 when mount point is
-		// is disconnected.
-		// this could be a bit of an issue and should be configurable !
-		// probably shouldn't be able to be reset so easily without a prompt !
-		// for now just skipping.
-		// and only looking at missing ones. seemingly.
-		// TODO: SHOULD ADD MESSAGE "Mount point: '' seems to be disconnected, mark downloads as missing ?"
-		if (!ft.categories)
-		{
-			continue;
-		}
-
 		do 
 		{
+			// this will be empty when all rows are found.
 			res = await getrows (universaldb, sql, [curruser.userid, offset])
 
 			offset+=100
@@ -140,7 +129,8 @@ async function main()
 
 				if (f.Found)
 				{
-					console.log('Found');
+					console.log('Found a file of the same name.');
+
 				}
 			}
 
