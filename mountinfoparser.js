@@ -3,8 +3,21 @@ const fs = require('fs');
 
 class MountInfo
 {
-    constructor(entry)
+
+    static Mounts = []
+
+    static ParseMounts()
     {
+        MountInfo.Mounts = FSMounts();
+    }
+
+    static WhichDevice(file)
+    {
+
+    }
+
+    constructor(entry)
+    { 
         this.Device = entry[0];
         this.MountPoint = entry[1];
         this.FSType = entry[2];
@@ -38,11 +51,6 @@ class MountInfo
             {
                 return false;
             }
-        }
-
-        this.OnDevice = function(item)
-        {
-
         }
     }
 }

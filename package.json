@@ -17,7 +17,6 @@
     "install": "^0.13.0",
     "lodash": "^4.17.21",
     "mime-types": "^2.1.31",
-    "mount-point": "^3.0.0",
     "node-persist": "^3.1.0",
     "object-sizeof": "^1.6.1",
     "passport": "^0.4.1",
