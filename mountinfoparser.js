@@ -79,33 +79,6 @@ class MountInfo
 
             }
         }
-        this.ContainsPath = function(pathitem)
-        {
-            // ok john you're half asleep
-            // but this should be simple no matter how goddamn old you are
-            // and you are.
-            // damn it.
-
-            // ugh i did this already !
-
-            // /mounty1/dir
-            // /mounty1/dir/mounty2
-            // /mounty1/dir/mounty2/dir2/mounty3
-            //  sort these out if you end up with a file /mounty1/dir/mounty2/dir/mounty3/afile
-            // obcviously its under the third one.
-
-            if (fs.existsSync(pathitem))
-            {
-                if (pathitem.startsWith(this.MountPoint))
-                {
-                    return true;
-                }                
-            }
-            else
-            {
-                return false;
-            }
-        }
     }
 }
 
