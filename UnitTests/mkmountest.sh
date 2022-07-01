@@ -64,14 +64,16 @@ mount ${first}p4 testmount/test1/test2/vol1
 btrfs subvolume create testmount/test1/test2/vol1/t1
 btrfs subvolume create testmount/test1/test2/vol1/t2
 
-umount testmount/test1/test2/vol1
+umount -l testmount/test1/test2/vol1
 
 mount ${first}p4 -o subvol=t1 testmount/test1/test2/vol1
 mount ${first}p4 -o subvol=t2 testmount/test1/test2/vol2
 
 
-touch  testmount/1.txt
+touch testmount/1.txt
 touch testmount/test1/2.txt
 touch testmount/test1/test2/3.txt
+touch testmount/test1/test2/vol1/1.txt
+touch testmount/test1/test2/vol2/2.txt
 
 chmod 777 -R testmount

@@ -19,6 +19,7 @@ const sql = require('sqlite3').verbose();
 const itemstore = require('../storemgr/itemstore');
 const getrows = require("../storemgr/getRows");
 const { MountInfo } = require("../mountinfoparser");
+const path = require("path");
 
 function recursepath(path) {
 	var files = [];
@@ -79,7 +80,8 @@ async function main()
 			{
 				console.log("Trusted Store: "+dir.Directory)
 
-				var files = recursepath(dir.Directory);
+				
+				var files = recursepath( MountInfo.ExpandPath(dir.MountPointUUID,  dir.Directory));
 
 				console.log("Found:  "+ files.length);
 
@@ -111,6 +113,8 @@ async function main()
 		limit 100 offset ?
 		`
 
+
+
 		var res = {}
 		var offset = 0
 
@@ -130,6 +134,34 @@ async function main()
 				if (f.Found)
 				{
 					console.log('Found a file of the same name.');
+					
+					var mismatch = []
+					var match =[]
+
+					for (var d in f.Obj)
+					{
+						var f = path.join(f.Obj[d],f.Key)
+						var s = fs.statSync(f);
+						var len = s.size;
+						
+						if ( currrow.FileNameOnServer == len)
+						{
+							match.append(f)
+						}
+						else
+						{
+							mismatch.append(f)
+						}
+					}
+
+					console.log(`Matches ${match.length} files`);
+					console.log(`Record mismatched with ${mismatch.length}`);
+
+					for (var m in match)	
+					{
+						var dev = MountInfo.WhichDevice(match[m]);
+						
+					}		
 
 				}
 			}

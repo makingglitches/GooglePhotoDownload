@@ -12,6 +12,10 @@
 const { retry, findSeries } = require("async");
 const getrows = require("./getRows");
 const fs = require('fs');
+const mountinfo = require('../mountinfoparser');
+const path = require("path");
+const { MountInfo } = require("../mountinfoparser");
+const { startsWith } = require("lodash");
 
 
 class GoogleAccount  
@@ -165,6 +169,8 @@ class GoogleAccount
 
         this.GetDirectories = async function (db)
         {
+            MountInfo.ParseMounts();
+
             var sql = 'select * from ImageDirectories where UserId=? or not UserSpecific and Active'
 
             var res = await getrows(db, sql, [this.userid]);
@@ -175,10 +181,25 @@ class GoogleAccount
             
             for (var i in startdirs)
             {
-                // sometimes a directory is a mount point in linux.
-                if (fs.existsSync(startdirs[i].Directory))
+                var currobj = startdirs[i];
+
+                var dir = MountInfo.ExpandPath(currobj.MountPointUUID,currobj.Directory);
+
+                for (var d in dir)
                 {
-                    this.directories.push(startdirs[i])
+                    // sometimes a directory is a mount point in linux.
+                    if (fs.existsSync(dir[d]))
+                    {
+                        // TODO: think of better way of handling this.
+                        // btrf-fucking-s contains the possibility of subvolumes
+                        // this quits the moment one of them contains the directory we're looking
+                        // for.
+                        // this could break if both contain the directory name.
+                        // lets hope they don't for now.
+                        // for now just populate the account with pertinent user directories.
+                        this.directories.push(currobj);
+                        break;
+                    }
                 }
             }
 
@@ -187,21 +208,25 @@ class GoogleAccount
 
         this.AddDirectory = async function (db, dirname, title, directorytype, main=false  )
         {
-            var sql = 
-            `insert or ignore into  ImageDirectories(Directory, Name, 
-                Active, TrustedStore, OriginalStore,  
-                ServerOnlyOrganizer, UserSpecific, UserId, Main,MountPoint)
-            values ( ?, ? , ? , ? , ? , ?, ?, ?, ?, ? )`
+            var sql =  fs.readFileSync('imagedirectory_insert.sql');
 
+            mountinfo.MountInfo.ParseMounts();
+
+            var m = mountinfo.MountInfo.WhichDevice(dirname);
+
+            var subpath = path.relative(m.MountPoint,dirname);
+            
             //TODO: ALSO BROKEN PENDING MOVEITEMS AND MOUNTPOINT SOLUTION
             // FOR DEVICE LOCATION COMPARISON
             var mp = null ; //await mountPoint(dirname);
 
+            //TODO: TEST THIS.
             var res = await getrows(db,
                      sql,
                      [
-                        dirname, 
-                        title, 
+                        title,
+                        m.UUID,
+                        subpath,
                         true, 
                         directorytype == GoogleAccount.DirectoryType.Download,
                         directorytype == GoogleAccount.DirectoryType.Original,
