@@ -1,0 +1,14 @@
+Model: Loopback device (loopback)
+Disk /dev/loop3: 21.0MB
+Sector size (logical/physical): 512B/512B
+Partition Table: gpt
+Disk Flags: 
+
+Number  Start   End     Size    File system  Name   Flags
+ 1      17.4kB  5000kB  4983kB               test1
+ 2      5243kB  10.5MB  5243kB               test1
+ 3      10.5MB  14.7MB  4194kB               test1
+
+tune2fs 1.46.3 (27-Jul-2021)
+tune2fs 1.46.3 (27-Jul-2021)
+tune2fs 1.46.3 (27-Jul-2021)

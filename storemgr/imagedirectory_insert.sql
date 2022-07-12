@@ -1,6 +1,8 @@
-INSERT or ignore INTO ImageDirectories (
+INSERT INTO ImageDirectories (
                                  Name,
                                  MountPointUUID,
+                                 SubVolumeId,
+                                 SubVolumePath,
                                  Directory,
                                  Active,
                                  TrustedStore,
@@ -10,4 +12,6 @@ INSERT or ignore INTO ImageDirectories (
                                  UserId,
                                  Main
                              )
-                             VALUES (?, ?, ? ,?, ? , ? ,?, ?,?,?)
+                             VALUES ( ?, ?, ? , ?,?, ?, ? , ?,?, ?, ? , ?)
+                                      
+    

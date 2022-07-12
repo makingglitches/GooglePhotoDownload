@@ -77,3 +77,7 @@ touch testmount/test1/test2/vol1/1.txt
 touch testmount/test1/test2/vol2/2.txt
 
 chmod 777 -R testmount
+
+cp ../EmptyStoreDB.sqlite tests.sqlite
+chmod 777 tests.sqlite
+

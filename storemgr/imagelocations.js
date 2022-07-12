@@ -2,7 +2,7 @@ const { findSeries } = require("async");
 const getrows = require("./getRows");
 const queryResult = require("./queryresult");
 const fs = require('fs')
-const minfo = require('../mountinfoparser');
+const MountInfo = require('../mountinfoparser').MountInfo;
 
 var db = null;
 
@@ -52,7 +52,7 @@ class ImageLocation
      * @param {*} userid  UserId, leave null if not user specific.
      * @returns 
      */
-    static CreateNew(directory, storetype, main=false, userid=false)
+    static CreateNew(directory, storetype, main=false, userid=null)
     {
         if (!fs.existsSync(directory))
         {
@@ -79,7 +79,7 @@ class ImageLocation
 
     static async GetAll(ActiveOnly=false)
     {
-        var sql = fs.readFileSync('storemgr/imagedirectories_select.sql');
+        var sql = fs.readFileSync('storemgr/imagedirectories_select.sql').toString();
 
         if (ActiveOnly)
         {
@@ -95,7 +95,7 @@ class ImageLocation
             for (var i in res.rows)
             {
                 var row = res.rows[i];
-                ret.append(
+                ret.push(
                     new ImageLocation(  row.MounPointUUID, 
                                         row.SubVolumeId,
                                         row.SubVolumePath,
@@ -136,5 +136,44 @@ class ImageLocation
         this.StoreType = storetype;
         this.UserId = userid;
         this.Main = main;
+
+        this.Equals = function(other)
+        {
+            return (this.MounPointUUID == other.MounPointUUID &&
+                this.SubVolumeId == other.SubVolumeId &&
+                this.SubVolumePath == other.SubVolumePath &&
+                this.Active == other.Active && 
+                this.Path == other.Path );
+        }
+
+        this.Write = async function()
+        {
+            var sql = fs.readFileSync('storemgr/imagedirectory_insert.sql').toString();
+
+            var res = await getrows(db,sql,
+                [
+                    'Directory',
+                    this.UUID,
+                    this.SubVolumeId,
+                    this.SubVolumePath,
+                    this.Path,
+                    this.Active,
+                    this.StoreType == EStoreType.Trusted,
+                    this.StoreType == EStoreType.Originals,
+                    this.StoreType == EStoreType.ServerOnly,
+                    this.UserId != null,
+                    this.UserId,
+                    this.Main
+                ]);
+
+              return res;
+        }
     }
+}
+
+module.exports = 
+{
+    EStoreType:EStoreType,
+    ImageLocation:ImageLocation,
+    InitDB:InitDB
 }
