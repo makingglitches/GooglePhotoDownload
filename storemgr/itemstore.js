@@ -91,7 +91,7 @@ async function MarkFinished(id, finished, finishedsize, downloadmissinglocal = f
 }
 
 async function MarkMissingLocal(id, val) {
-	var r = await getrows(db, 'update storeitem set missinglocal = ? where id =?', [ val, id ]);
+	var r = await getrows(db, 'update storeitem set downloadmissinglocal = ? where id =?', [ val, id ]);
 
 	return r.success;
 }
