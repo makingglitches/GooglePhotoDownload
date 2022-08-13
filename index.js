@@ -270,7 +270,7 @@ async function grabNextHashQueue()
 		else
 		{
 			missing++;
-			itemstore.MarkMissingLocal(element.Id, true)
+			itemstore.MarkMissingLocal(element.Id, 1)
 		}
 	});
 } 
