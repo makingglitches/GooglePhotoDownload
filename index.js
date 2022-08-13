@@ -266,6 +266,7 @@ async function grabNextHashQueue()
 		if (fs.existsSync(filename))
 		{
 			hashqueue.push(element)
+			itemstore.MarkMissingLocal(element.Id, 0)
 		}
 		else
 		{
