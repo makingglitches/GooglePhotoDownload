@@ -183,7 +183,7 @@ class GoogleAccount
             {
                 var currobj = startdirs[i];
 
-                var dir = MountInfo.ExpandPath(currobj.MountPointUUID,currobj.Directory);
+                var dir = MountInfo.ExpandBTRFSPath(currobj.MountPointUUID,currobj.Directory);
 
                 for (var d in dir)
                 {

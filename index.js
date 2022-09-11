@@ -24,7 +24,6 @@ const KeyResult = kt.KeyResult;
 const sizeof = require('object-sizeof');
 const items = require('./storemgr/itemstore');
 const sql = require('sqlite3').verbose();
-const mountPoint = require('mount-point')
 
 
 var nodownload = false;

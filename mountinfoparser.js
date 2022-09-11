@@ -64,6 +64,7 @@ class MountInfo
                 {
                     mt.LABEL = bdev.label;
                     mt.UUID = bdev.uuid;
+                    mt.Size = bdev.fsavail
                     //mt.MountPoints = bdev.mountpoints;
                 } 
             }
@@ -95,8 +96,15 @@ class MountInfo
         return null;
     }
 
-    static ExpandPath(UUID,subpath,volid=null)
+    static ExpandPath(subpath)
     {
+        return path.join(process.cwd(),subpath);
+
+    }
+    
+    static ExpandBTRFSPath(UUID,subpath,volid=null)
+    {
+
         // this will likely only be used to find existing files.
         var m = this.ByUUID(UUID,volid);
 

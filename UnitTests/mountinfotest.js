@@ -1,7 +1,8 @@
 const { MountInfo } = require("../mountinfoparser");
 const {execSync} = require('child_process')
 const lodash = require('lodash')
-const fs = require('fs')
+const fs = require('fs');
+const path = require("path");
 // run mkmountest.sh first 
 
 
@@ -85,17 +86,18 @@ test("WhichDevice",
 
 
 // take the results and expand the device and subpath to the absolute system path.
-var fp = [MountInfo.ExpandPath(f1[0].UUID,f1[1],f1[0].SUBVOLUMEID),
-          MountInfo.ExpandPath(f2[0].UUID,f2[1],f2[0].SUBVOLUMEID),
-          MountInfo.ExpandPath(f3[0].UUID,f3[1],f3[0].SUBVOLUMEID),
-          MountInfo.ExpandPath(f4[0].UUID,f4[1],f4[0].SUBVOLUMEID),       
-          MountInfo.ExpandPath(f5[0].UUID,f5[1],f5[0].SUBVOLUMEID)];
+var fp = [MountInfo.ExpandBTRFSPath(f1[0].UUID,f1[1],f1[0].SUBVOLUMEID),
+          MountInfo.ExpandBTRFSPath(f2[0].UUID,f2[1],f2[0].SUBVOLUMEID),
+          MountInfo.ExpandBTRFSPath(f3[0].UUID,f3[1],f3[0].SUBVOLUMEID),
+          MountInfo.ExpandBTRFSPath(f4[0].UUID,f4[1],f4[0].SUBVOLUMEID),       
+          MountInfo.ExpandBTRFSPath(f5[0].UUID,f5[1],f5[0].SUBVOLUMEID)];
 
-var cp = [  '/Data/Documents/CensusProject/GooglePhotoDownload/UnitTests/testmount',
-            '/Data/Documents/CensusProject/GooglePhotoDownload/UnitTests/testmount/test1',
-            '/Data/Documents/CensusProject/GooglePhotoDownload/UnitTests/testmount/test1/test2',
-            '/Data/Documents/CensusProject/GooglePhotoDownload/UnitTests/testmount/test1/test2/vol1',
-            '/Data/Documents/CensusProject/GooglePhotoDownload/UnitTests/testmount/test1/test2/vol2'];
+
+var cp = [  MountInfo.ExpandPath( 'UnitTests/testmount'),
+            MountInfo.ExpandPath('UnitTests/testmount/test1'),
+            MountInfo.ExpandPath('UnitTests/testmount/test1/test2'),
+            MountInfo.ExpandPath('UnitTests/testmount/test1/test2/vol1'),
+            MountInfo.ExpandPath('UnitTests/testmount/test1/test2/vol2')];
             
 
 for (var i in fp)
