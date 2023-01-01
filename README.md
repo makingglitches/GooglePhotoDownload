@@ -24,3 +24,7 @@ One prohibits re-download
 the other indicates the downloaded file can't be found which can result from a location becoming unavailable or the file being moved
 
 the two do not exclusively get set together.
+
+The program also generates sha256 hashes of every downloaded file.
+
+There is also in the works a seperate subproject this will utilize that simply finds all copies of the same file isolating likely culprits in different locations and tracks them by the specific volume (partition and or disk serial) they reside on.
