@@ -1,5 +1,16 @@
+#
+#
+#
+#  Script: FixLocal.py
+#  Purpose: The purpose of this script is double check the existen
+#  and completion status of local files and update the database
+#  accordingly.
+#  Also will check the playability of files and sizes.
+
 import sqlite3
 import datetime
+
+
 
 con = sqlite3.connect('/home/john/Downloads/GooglePhotoDownload-0.75/ItemStore.sqlite')
 
