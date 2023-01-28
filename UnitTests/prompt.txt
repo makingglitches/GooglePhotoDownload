@@ -1,0 +1,45 @@
+consider the following code:
+
+# working test of photo api list and oauth in python. sigh.
+
+
+import requests
+import google.auth
+import pickle
+import os
+
+from google_auth_oauthlib.flow import InstalledAppFlow
+
+
+flow = InstalledAppFlow.from_client_secrets_file('../client_secrets.json', \
+    scopes=['https://www.googleapis.com/auth/photoslibrary.readonly', \
+        'https://www.googleapis.com/auth/userinfo.profile', \
+        'https://www.googleapis.com/auth/userinfo.email', \
+        'openid'])
+    
+
+creds = flow.run_local_server(port=8028,open_browser=False, success_message="<b>CLOSE THE BROWSER NOW YOU BASTARD</B>")
+
+
+endpoint = "https://photoslibrary.googleapis.com/v1/mediaItems"
+params = {
+    "pageSize": 10,
+}
+
+headers = {
+    'Authorization': 'Bearer '+ creds.token,
+}
+
+
+response = requests.get(endpoint,headers=headers, params=params)
+
+print (response.json())
+
+using the script as a model generate a python class that implements all the class methods in the photos api and stores the tokens in properties and in a file using pickle, checking if the refresh code is still valid by looking for a pickled copy of that object, and if it exists locating it and using the refreshtoken to get a new access code.  for each of the class methods implementing a photos api feature, have default values specified for parameters if they are left blank and create code to handle those when create the http request to the photo api's endpoints.
+replace all instances of the text "{media_item_id}" with an f-string adding the proper method parameter
+make oauth section of constructor into a static constructor. do not run the oauth process unless the stored credentials are either not present or invalid.
+make certain to check if the refresh token is still valid, if it is and the access token is expired attempt to update the access token if possible before sending user throw oauth process
+implement continuation token into get_media_items so the user can get the next page if the value is provided.
+handle failures and error codes passed by the api 
+make the location of the client_secrets.json a parameter
+type anything that would accept a comma seperated list as a list instead

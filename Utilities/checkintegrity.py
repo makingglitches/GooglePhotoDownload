@@ -64,27 +64,24 @@ print('done.')
 
 # if error log contains any lines, there was a problem
 f = open("error.log", "r")
-
 alllines = f.read()
-
 f.close()
 
-error = False
 
 if len(alllines) > 0:
     print(f"errors in {videofilename}")
-
+    error = True
     err = open("fileerrors.log",'a')
     err.write(videofilename+"\n")
     err.flush()
     err.close()
-    
-if not error:
-    f = open("succeeded.log",'a')
+    exit(1)    
 
-    f.write(videofilename+"\n")
 
-    f.flush()
-    f.close()
 
-exit(error)
+f = open("succeeded.log",'a')
+f.write(videofilename+"\n")
+f.flush()
+f.close()
+
+exit(0)
