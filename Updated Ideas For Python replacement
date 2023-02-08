@@ -1,0 +1,24 @@
+Improved Google Syncer.
+
+A single login to each account should be necessary, the resulting access token should be stored using the Pickle file format of Python 3.
+A field should be added to the Accounts table to contain the refresh token last retrieved and access token presently in usee.
+At startup each access token should be used to connect to an account.
+The accounts should be cycled through and a new list pulled back from each to compare against items existing in the StoreItem table of the sqlite database.
+If the access token is expired, request a new one using the refresh token.
+If this is expired, show a link for the user to login and provide a new one.
+
+
+At some point tracking the file's movements is necessary to prevent duplicate downloads, also if the files disappear online this needs updated in StoreItem.
+If the files completely go missing locally, this needs to be updated in StoreItem.
+
+Continuation of a utility that tracks partitions and disks and subvolumes by UUID and Serial Number is a prerequisite. This way duplicates can be discovered.
+
+The ImageDirectories table needs to be configurable. StoreItemLocation needs updated.
+
+Build a bintree including mount location of all files found in the ImageDirectories, and mark them accordingly to allow discovery of duplicates
+and their deletion.
+
+Despite that assholes complaints, include video playability and damage checking into the download process, store the errors file in a StoreItem Field with a status flag to indicate damaged if the download is whole.
+
+
+
