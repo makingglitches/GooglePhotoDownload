@@ -1,402 +1,161 @@
+ and a brief description of what they do.
 
-"""
+test your code by calling the methods of your class and printing the results.
 
-class Photo:
-    """
-    accesses the google photos api using the google auth library and the requests library.
-    """
-    def __init__(self,client_secret_file="client_secrets.json"):
-        """
-        initializes the google photos api class and generates the credentials needed to make requests to the api.
-        """
-        self.creds = self.get_creds(client_secret_file)
-    
-    @staticmethod
-    def get_creds(client_secret_file):
-        """
-        returns the credentials needed to make requests to the google photos api.
-        """
-        if os.path.isfile("token.pickle"):
-            with open("token.pickle","rb") as token:
-                creds = pickle.load(token)
-        
-        if not creds or not creds.valid:
-            if creds and creds.expired and creds.refresh_token:
-                creds.refresh(Request())
-            else:
-                flow = InstalledAppFlow.from_client_secrets_file(client_secret_file, \
-                    scopes=['https://www.googleapis.com/auth/photoslibrary.readonly', \
-                        'https://www.googleapis.com/auth/userinfo.profile', \
-                        'https://www.googleapis.com/auth/userinfo.email', \
-                        'openid'])
-                
-                creds = flow.run_local_server(port=8028,open_browser=False, success_message="<b>CLOSE THE BROWSER NOW YOU BASTARD</B>")
-                
-            with open("token.pickle","wb") as token:
-                pickle.dump(creds,token)
-                
-        return creds
-        
-    def get_media_items(self,page_size=10,page_token=None):
-        """
-        returns a page of media items from the google photos api.
-        """
-        endpoint = "https://photoslibrary.googleapis.com/v1/mediaItems"
-        params = {
-            "pageSize": page_size,
-        }
-        if page_token:
-            params.update({"pageToken":page_token})
-            
-        headers = {
-            'Authorization': 'Bearer '+ self.creds.token,
-        }
-        response = requests.get(endpoint,headers=headers, params=params)
-        
-        return response.json()
-        
-    def get_media_item(self,media_item_id):
-        """
-        returns a media item from the google photos api.
-        """
-        endpoint = f"https://photoslibrary.googleapis.com/v1/mediaItems/{media_item_id}"
-        headers = {
-            'Authorization': 'Bearer '+ self.creds.token,
-        }
-        response = requests.get(endpoint,headers=headers)
-        
-        return response.json()
-        
-    def get_shared_albums(self,page_size=10,page_token=None):
-        """
-        returns a page of shared albums from the google photos api.
-        """
-        endpoint = "https://photoslibrary.googleapis.com/v1/sharedAlbums"
-        params = {
-            "pageSize": page_size,
-        }
-        if page_token:
-            params.update({"pageToken":page_token})
-            
-        headers = {
-            'Authorization': 'Bearer '+ self.creds.token,
-        }
-        response = requests.get(endpoint,headers=headers, params=params)
-        
-        return response.json()
-        
-    def get_shared_album(self,shared_album_id):
-        """
-        returns a shared album from the google photos api.
-        """
-        endpoint = f"https://photoslibrary.googleapis.com/v1/sharedAlbums/{shared_album_id}"
-        headers = {
-            'Authorization': 'Bearer '+ self.creds.token,
-        }
-        response = requests.get(endpoint,headers=headers)
-        
-        return response.json()
-        
-    def get_shared_album_items(self,shared_album_id,page_size=10,page_token=None):
-        """
-        returns a page of media items from the google photos api from a shared album.
-        """
-        endpoint = f"https://photoslibrary.googleapis.com/v1/sharedAlbums/{shared_album_id}/mediaItems"
-        params = {
-            "pageSize": page_size,
-        }
-        if page_token:
-            params.update({"pageToken":page_token})
-            
-        headers = {
-            'Authorization': 'Bearer '+ self.creds.token,
-        }
-        response = requests.get(endpoint,headers=headers, params=params)
-        
-        return response.json()
-        
-    def search(self,filters,page_size=10,page_token=None):
-        """
-        returns a page of media items from the google photos api based on search criteria.
-        """
-        endpoint = "https://photoslibrary.googleapis.com/v1/mediaItems:search"
-        params = {
-            "pageSize": page_size,
-        }
-        if page_token:
-            params.update({"pageToken":page_token})
-            
-        headers = {
-            'Authorization': 'Bearer '+ self.creds.token,
-        }
-        response = requests.post(endpoint,headers=headers, params=params, json=filters)
-        
-        return response.json()
-        
-    def add_media_items(self,album_id,media_items):
-        """
-        adds media items to an album in the google photos api.
-        """
-        endpoint = "https://photoslibrary.googleapis.com/v1/albums/{album_id}:batchAddMediaItems"
-        params = {
-            "album_id": album_id,
-        }
-        headers = {
-            'Authorization': 'Bearer '+ self.creds.token,
-        }
-        response = requests.post(endpoint,headers=headers, params=params, json=media_items)
-        
-        return response.json()
-        
-    def create_album(self,album_title,album_description=None,album_location=None,cover_photo_id=None):
-        """
-        creates an album in the google photos api.
-        """
-        endpoint = "https://photoslibrary.googleapis.com/v1/albums"
-        headers = {
-            'Authorization': 'Bearer '+ self.creds.token,
-        }
-        data = {
-            "album": {
-                "title": album_title,
-            }
-        }
-        if album_description:
-            data["album"].update({"album_description":album_description})
-        if album_location:
-            data["album"].update({"album_location":album_location})
-        if cover_photo_id:
-            data["album"].update({"cover_photo_id":cover_photo_id})
-            
-        response = requests.post(endpoint,headers=headers, json=data)
-        
-        return response.json()
-        
-    def add_enrichment(self,media_item_id,album_id,new_media_item_id=None):
-        """
-        adds an enrichment to a media item in the google photos api.
-        """
-        endpoint = f"https://photoslibrary.googleapis.com/v1/mediaItems/{media_item_id}:batchAddEnrichment"
-        headers = {
-            'Authorization': 'Bearer '+ self.creds.token,
-        }
-        data = {
-            "newEnrichmentItem": {
-                "albumPosition": {
-                    "relativeEnrichmentItemId": media_item_id,
-                    "relativePosition": "AFTER_DESCENDANTS",
-                },
-                "locationEnrichment": {
-                    "location": {
-                        "latlng": {
-                            "latitude": 0.0,
-                            "longitude": 0.0,
-                        }
-                    },
-                },
-                "textEnrichment": {
-                    "text": "sample text",
-                },
-            }
-        }
-        if new_media_item_id:
-            data["newEnrichmentItem"].update({"newMediaItem":new_media_item_id})
-            
-        response = requests.post(endpoint,headers=headers, json=data)
-        
-        return response.json()
-        
-    def join_shared_album(self,shared_album_id):
-        """
-        joins a shared album in the google photos api.
-        """
-        endpoint = f"https://photoslibrary.googleapis.com/v1/sharedAlbums/{shared_album_id}:join"
-        headers = {
-            'Authorization': 'Bearer '+ self.creds.token,
-        }
-        response = requests.post(endpoint,headers=headers)
-        
-        return response.json()
-        
-    def leave_shared_album(self,shared_album_id):
-        """
-        leaves a shared album in the google photos api.
-        """
-        endpoint = f"https://photoslibrary.googleapis.com/v1/sharedAlbums/{shared_album_id}:leave"
-        headers = {
-            'Authorization': 'Bearer '+ self.creds.token,
-        }
-        response = requests.post(endpoint,headers=headers)
-        
-        return response.json()
-        
-    def share_album(self,album_id,shared_album_options=None):
-        """
-        shares an album in the google photos api.
-        """
-        endpoint = f"https://photoslibrary.googleapis.com/v1/albums/{album_id}:share"
-        headers = {
-            'Authorization': 'Bearer '+ self.creds.token,
-        }
-        data = {
-            "sharedAlbumOptions": {
-                "isCollaborative": True,
-                "isCommentable": True,
-            }
-        }
-        if shared_album_options:
-            data.update(shared_album_options)
-            
-        response = requests.post(endpoint,headers=headers, json=data)
-        
-        return response.json()
-        
-    def list_shared_albums(self,page_size=10,page_token=None):
-        """
-        returns a list of shared albums from the google photos api.
-        """
-        endpoint = "https://photoslibrary.googleapis.com/v1/sharedAlbums"
-        params = {
-            "pageSize": page_size,
-        }
-        if page_token:
-            params.update({"pageToken":page_token})
-            
-        headers = {
-            'Authorization': 'Bearer '+ self.creds.token,
-        }
-        response = requests.get(endpoint,headers=headers, params=params)
-        
-        return response.json()
-        
-    def unshare_album(self,shared_album_id):
-        """
-        unshares a shared album in the google photos api.
-        """
-        endpoint = f"https://photoslibrary.googleapis.com/v1/sharedAlbums/{shared_album_id}:unshare"
-        headers = {
-            'Authorization': 'Bearer '+ self.creds.token,
-        }
-        response = requests.post(endpoint,headers=headers)
-        
-        return response.json()
-        
-    def list_shared_album_contents(self,shared_album_id,page_size=10,page_token=None):
-        """
-        returns a list of contents from a shared album in the google photos api.
-        """
-        endpoint = f"https://photoslibrary.googleapis.com/v1/sharedAlbums/{shared_album_id}/mediaItems"
-        params = {
-            "pageSize": page_size,
-        }
-        if page_token:
-            params.update({"pageToken":page_token})
-            
-        headers = {
-            'Authorization': 'Bearer '+ self.creds.token,
-        }
-        response = requests.get(endpoint,headers=headers, params=params)
-        
-        return response.json()
-        
-    def list_album_contents(self,album_id,page_size=10,page_token=None):
-        """
-        returns a list of contents from an album in the google photos api.
-        """
-        endpoint = f"https://photoslibrary.googleapis.com/v1/albums/{album_id}/mediaItems"
-        params = {
-            "pageSize": page_size,
-        }
-        if page_token:
-            params.update({"pageToken":page_token})
-            
-        headers = {
-            'Authorization': 'Bearer '+ self.creds.token,
-        }
-        response = requests.get(endpoint,headers=headers, params=params)
-        
-        return response.json()
-        
-    def list_albums(self,page_size=10,page_token=None):
-        """
-        returns a list of albums from the google photos api.
-        """
-        endpoint = "https://photoslibrary.googleapis.com/v1/albums"
-        params = {
-            "pageSize": page_size,
-        }
-        if page_token:
-            params.update({"pageToken":page_token})
-            
-        headers = {
-            'Authorization': 'Bearer '+ self.creds.token,
-        }
-        response = requests.get(endpoint,headers=headers, params=params)
-        
-        return response.json()
-        
-    def batch_create_media_items(self,new_media_items):
-        """
-        adds multiple media items to the google photos api.
-        """
-        endpoint = "https://photoslibrary.googleapis.com/v1/mediaItems:batchCreate"
-        headers = {
-            'Authorization': 'Bearer '+ self.creds.token,
-        }
-        response = requests.post(endpoint,headers=headers, json=new_media_items)
-        
-        return response.json()
-        
-    def batch_get_media_items(self,media_item_ids):
-        """
-        returns a list of media items from the google photos api.
-        """
-        endpoint = "https://photoslibrary.googleapis.com/v1/mediaItems:batchGet"
-        headers = {
-            'Authorization': 'Bearer '+ self.creds.token,
-        }
-        response = requests.post(endpoint,headers=headers, json=media_item_ids)
-        
-        return response.json()
-        
-    def batch_get_shared_albums(self,shared_album_ids):
-        """
-        returns a list of shared albums from the google photos api.
-        """
-        endpoint = "https://photoslibrary.googleapis.com/v1/sharedAlbums:batchGet"
-        headers = {
-            'Authorization': 'Bearer '+ self.creds.token,
-        }
-        response = requests.post(endpoint,headers=headers, json=shared_album_ids)
-        
-        return response.json()
-        
-    def get_media_item_download_url(self,media_item_id):
-        """
-        returns a url to download a media item from the google photos api.
-        """
-        endpoint = f"https://photoslibrary.googleapis.com/v1/mediaItems/{media_item_id}:getDownloadUrl"
-        headers = {
-            'Authorization': 'Bearer '+ self.creds.token,
-        }
-        response = requests.post(endpoint,headers=headers)
-        
-        return response.json()
-        
-    def batch_remove_media_items(self,media_item_ids):
-        """
-        removes media items from the google photos api.
-        """
-        endpoint = "https://photoslibrary.googleapis.com/v1/mediaItems:batchRemove"
-        headers = {
-            'Authorization': 'Bearer '+ self.creds.token,
-        }
-        response = requests.post(endpoint,headers=headers, json=media_item_ids)
-        
-        return response.json()
-        
-    def batch_remove_shared_albums(self,shared_album_ids):
-        """
-        removes shared albums from the google photos api.
-        """
-        endpoint = "https://photoslibrary.googleapis.com/v1
+submit your code as a file named PhotosAPI.py
+
+# PhotosAPI class methods
+
+PhotosAPI() - constructor
+
+get_media_items() - returns a list of the media items in the user's library
+
+get_shared_albums() - returns a list of the shared albums in the user's library
+
+get_albums() - returns a list of the albums in the user's library
+
+create_album(album_name) - creates a new album with the name album_name
+
+create_album_with_description(album_name,album_description) - creates a new album with the name album_name and the description album_description
+
+create_shared_album(album_name) - creates a new shared album with the name album_name
+
+create_shared_album_with_description(album_name,album_description) - creates a new shared album with the name album_name and the description album_description
+
+get_album(album_id) - returns the album with the id album_id
+
+add_media_item_to_album(media_item_id,album_id) - adds the media item with the id media_item_id to the album with the id album_id
+
+remove_media_item_from_album(media_item_id,album_id) - removes the media item with the id media_item_id from the album with the id album_id
+
+get_media_item(media_item_id) - returns the media item with the id media_item_id
+
+get_shared_album(shared_album_id) - returns the shared album with the id shared_album_id
+
+get_media_items_from_shared_album(shared_album_id) - returns the list of media items in the shared album with the id shared_album_id
+
+get_media_item_from_shared_album(shared_album_id,media_item_id) - returns the media item with the id media_item_id from the shared album with the id shared_album_id
+
+add_comment_to_media_item(media_item_id,comment_text) - adds the comment comment_text to the media item with the id media_item_id
+
+remove_comment_from_media_item(media_item_id,comment_id) - removes the comment with the id comment_id from the media item with the id media_item_id
+
+add_comment_to_media_item_in_shared_album(shared_album_id,media_item_id,comment_text) - adds the comment comment_text to the media item with the id media_item_id in the shared album with the id shared_album_id
+
+remove_comment_from_media_item_in_shared_album(shared_album_id,media_item_id,comment_id) - removes the comment with the id comment_id from the media item with the id media_item_id in the shared album with the id shared_album_id
+
+get_media_item_exif(media_item_id) - returns the exif data for the media item with the id media_item_id
+
+get_media_item_exif_from_shared_album(shared_album_id,media_item_id) - returns the exif data for the media item with the id media_item_id in the shared album with the id shared_album_id
+
+get_media_item_download_url(media_item_id) - returns the download url for the media item with the id media_item_id
+
+get_media_item_download_url_from_shared_album(shared_album_id,media_item_id) - returns the download url for the media item with the id media_item_id in the shared album with the id shared_album_id
+
+search_media_items(query) - returns a list of media items that match the search query query
+
+search_media_items_in_shared_album(shared_album_id,query) - returns a list of media items in the shared album with the id shared_album_id that match the search query query
+
+get_user_info() - returns the user's email address
+
+get_user_profile() - returns the user's profile information
+
+get_user_photos_library_settings() - returns the user's photos library settings
+
+get_user_photos_library_settings_from_shared_album(shared_album_id) - returns the user's photos library settings for the shared album with the id shared_album_id
+
+get_user_photos_library_metadata() - returns metadata about the user's photos library
+
+get_user_photos_library_metadata_from_shared_album(shared_album_id) - returns metadata about the photos library of the user who owns the shared album with the id shared_album_id
+
+get_user_photos_library_metadata_from_shared_album_contributor(shared_album_id) - returns metadata about the photos library of the user who contributed to the shared album with the id shared_album_id
+
+get_user_photos_library_metadata_from_shared_album_collaborator(shared_album_id) - returns metadata about the photos library of the user who collaborated on the shared album with the id shared_album_id
+
+get_user_photos_library_metadata_from_shared_album_viewer(shared_album_id) - returns metadata about the photos library of the user who viewed the shared album with the id shared_album_id
+
+add_media_item(upload_token) - adds the media item with the upload token upload_token to the user's library
+
+add_media_item_to_shared_album(shared_album_id,upload_token) - adds the media item with the upload token upload_token to the shared album with the id shared_album_id
+
+get_media_item_upload_token_from_file(media_item_file) - returns an upload token for the media item in the file media_item_file
+
+get_media_item_upload_token_from_url(media_item_url) - returns an upload token for the media item at the url media_item_url
+
+get_media_item_upload_token_from_bytes(media_item_bytes_array) - returns an upload token for the media item in the byte array media_item_bytes_array
+
+get_media_item_upload_token_from_stream(media_item_stream) - returns an upload token for the media item in the stream media_item_stream
+
+get_media_item_upload_token_from_file_in_shared_album(shared_album_id,media_item_file) - returns an upload token for the media item in the file media_item_file to be added to the shared album with the id shared_album_id
+
+get_media_item_upload_token_from_url_in_shared_album(shared_album_id,media_item_url) - returns an upload token for the media item at the url media_item_url to be added to the shared album with the id shared_album_id
+
+get_media_item_upload_token_from_bytes_in_shared_album(shared_album_id,media_item_bytes_array) - returns an upload token for the media item in the byte array media_item_bytes_array to be added to the shared album with the id shared_album_id
+
+get_media_item_upload_token_from_stream_in_shared_album(shared_album_id,media_item_stream) - returns an upload token for the media item in the stream media_item_stream to be added to the shared album with the id shared_album_id
+
+get_media_item_upload_token_from_file_in_shared_album_contributor(shared_album_id,media_item_file) - returns an upload token for the media item in the file media_item_file to be added to the shared album with the id shared_album_id by a contributor
+
+get_media_item_upload_token_from_url_in_shared_album_contributor(shared_album_id,media_item_url) - returns an upload token for the media item at the url media_item_url to be added to the shared album with the id shared_album_id by a contributor
+
+get_media_item_upload_token_from_bytes_in_shared_album_contributor(shared_album_id,media_item_bytes_array) - returns an upload token for the media item in the byte array media_item_bytes_array to be added to the shared album with the id shared_album_id by a contributor
+
+get_media_item_upload_token_from_stream_in_shared_album_contributor(shared_album_id,media_item_stream) - returns an upload token for the media item in the stream media_item_stream to be added to the shared album with the id shared_album_id by a contributor
+
+get_media_item_upload_token_from_file_in_shared_album_collaborator(shared_album_id,media_item_file) - returns an upload token for the media item in the file media_item_file to be added to the shared album with the id shared_album_id by a collaborator
+
+get_media_item_upload_token_from_url_in_shared_album_collaborator(shared_album_id,media_item_url) - returns an upload token for the media item at the url media_item_url to be added to the shared album with the id shared_album_id by a collaborator
+
+get_media_item_upload_token_from_bytes_in_shared_album_collaborator(shared_album_id,media_item_bytes_array) - returns an upload token for the media item in the byte array media_item_bytes_array to be added to the shared album with the id shared_album_id by a collaborator
+
+get_media_item_upload_token_from_stream_in_shared_album_collaborator(shared_album_id,media_item_stream) - returns an upload token for the media item in the stream media_item_stream to be added to the shared album with the id shared_album_id by a collaborator
+
+get_media_item_upload_token_from_file_in_shared_album_viewer(shared_album_id,media_item_file) - returns an upload token for the media item in the file media_item_file to be added to the shared album with the id shared_album_id by a viewer
+
+get_media_item_upload_token_from_url_in_shared_album_viewer(shared_album_id,media_item_url) - returns an upload token for the media item at the url media_item_url to be added to the shared album with the id shared_album_id by a viewer
+
+get_media_item_upload_token_from_bytes_in_shared_album_viewer(shared_album_id,media_item_bytes_array) - returns an upload token for the media item in the byte array media_item_bytes_array to be added to the shared album with the id shared_album_id by a viewer
+
+get_media_item_upload_token_from_stream_in_shared_album_viewer(shared_album_id,media_item_stream) - returns an upload token for the media item in the stream media_item_stream to be added to the shared album with the id shared_album_id by a viewer
+
+batch_add_media_items(upload_tokens) - adds the media items with the upload tokens in the array upload_tokens to the user's library
+
+batch_add_media_items_to_shared_album(shared_album_id,upload_tokens) - adds the media items with the upload tokens in the array upload_tokens to the shared album with the id shared_album_id
+
+batch_add_media_items_to_shared_album_contributor(shared_album_id,upload_tokens) - adds the media items with the upload tokens in the array upload_tokens to the shared album with the id shared_album_id by a contributor
+
+batch_add_media_items_to_shared_album_collaborator(shared_album_id,upload_tokens) - adds the media items with the upload tokens in the array upload_tokens to the shared album with the id shared_album_id by a collaborator
+
+batch_add_media_items_to_shared_album_viewer(shared_album_id,upload_tokens) - adds the media items with the upload tokens in the array upload_tokens to the shared album with the id shared_album_id by a viewer
+
+search_media_items_by_filters(filters) - returns a list of media items that match the search filters in the array filters
+
+search_media_items_by_filters_in_shared_album(shared_album_id,filters) - returns a list of media items in the shared album with the id shared_album_id that match the search filters in the array filters
+
+search_media_items_by_filters_in_shared_album_contributor(shared_album_id,filters) - returns a list of media items in the shared album with the id shared_album_id that match the search filters in the array filters by a contributor
+
+search_media_items_by_filters_in_shared_album_collaborator(shared_album_id,filters) - returns a list of media items in the shared album with the id shared_album_id that match the search filters in the array filters by a collaborator
+
+search_media_items_by_filters_in_shared_album_viewer(shared_album_id,filters) - returns a list of media items in the shared album with the id shared_album_id that match the search filters in the array filters by a viewer
+
+get_media_item_upload_token_from_file_by_filters(media_item_file,filters) - returns an upload token for the media item in the file media_item_file with the search filters in the array filters
+
+get_media_item_upload_token_from_url_by_filters(media_item_url,filters) - returns an upload token for the media item at the url media_item_url with the search filters in the array filters
+
+get_media_item_upload_token_from_bytes_by_filters(media_item_bytes_array,filters) - returns an upload token for the media item in the byte array media_item_bytes_array with the search filters in the array filters
+
+get_media_item_upload_token_from_stream_by_filters(media_item_stream,filters) - returns an upload token for the media item in the stream media_item_stream with the search filters in the array filters
+
+get_media_item_upload_token_from_file_by_filters_in_shared_album(shared_album_id,media_item_file,filters) - returns an upload token for the media item in the file media_item_file with the search filters in the array filters to be added to the shared album with the id shared_album_id
+
+get_media_item_upload_token_from_url_by_filters_in_shared_album(shared_album_id,media_item_url,filters) - returns an upload token for the media item at the url media_item_url with the search filters in the array filters to be added to the shared album with the id shared_album_id
+
+get_media_item_upload_token_from_bytes_by_filters_in_shared_album(shared_album_id,media_item_bytes_array,filters) - returns an upload token for the media item in the byte array media_item_bytes_array with the search filters in the array filters to be added to the shared album with the id shared_album_id
+
+get_media_item_upload_token_from_stream_by_filters_in_shared_album(shared_album_id,media_item_stream,filters) - returns an upload token for the media item in the stream media_item_stream with the search filters in the array filters to be added to the shared album with the id shared_album_id
+
+get_media_item_upload_token_from_file_by_filters_in_shared_album_contributor(shared_album_id,media_item_file,filters) - returns an upload token for the media item in the file media_item_file with the search filters in the array filters to be added to the shared album with the id shared_album_id by a contributor
+
+get_media_item_upload_token_from_url_by_filters_in_shared_album_contributor(shared_album_id,media_item_url,filters) - returns an upload token for the media item at the url media_item_url with the search filters in the array filters to be added to the shared album with the id shared_album_id by a contributor
+
+get_media_item_upload_token_from_bytes_by_filters_in_shared_album_contributor

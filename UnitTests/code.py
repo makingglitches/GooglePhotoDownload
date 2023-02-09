@@ -297,7 +297,7 @@ albums = p.get_albums()
 
 photos = p.get_media_items()
 
-ares = albums['albums']
+arfes = albums['albums']
 apho = photos['mediaItems']
 
 albums = p.get_albums(page_size=10, page_token= albums['nextPageToken'])

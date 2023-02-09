@@ -26,8 +26,11 @@ if not os.path.exists('fileerrors.log'):
 if not os.path.exists("succeeded.log"):
     os.system('touch succeeded.log')
 
+videopath = sys.argv[1]
+
+files = os.listdir(videopath)
 #retrieve filename, first and only argument
-videofilename = sys.argv[1]
+#videofilename = sys.argv[1]
 
 #videofilename="/mnt/Seagate1TB/Photos and Videos/partyinthecia2/VID_20150315_045652.mp4"
 

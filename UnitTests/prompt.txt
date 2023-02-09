@@ -42,4 +42,6 @@ make certain to check if the refresh token is still valid, if it is and the acce
 implement continuation token into get_media_items so the user can get the next page if the value is provided.
 handle failures and error codes passed by the api 
 make the location of the client_secrets.json a parameter
-type anything that would accept a comma seperated list as a list instead
+name the class PhotosAPI
+
+at the beginning of the code, generate a multiline comment containing a list of the names contained in PhotosAPI class
