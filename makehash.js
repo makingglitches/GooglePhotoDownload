@@ -1,85 +1,160 @@
-const crypto = require('crypto')
-const fs = require('fs')
-const { fasttest } = require('./config')
-const path = require('path')
-const itemstore = require('./storemgr/itemstore')
+const crypto = require("crypto");
+const fs = require("fs");
+const { fasttest } = require("./config");
+const path = require("path");
+const itemstore = require("./storemgr/itemstore");
 
-function createSha256(plainstring)
-{
-    var h = crypto.createHash('sha256')
+function createSha256(plainstring) {
 
-    h.update(plainstring)
+    var h = crypto.createHash("sha256", {encoding:"binary" });
 
-    return h.digest('base64')
+  h.update(plainstring);
+
+  return h.digest("base64");
 }
 
-
-async function HashItem(db,storeitem, location, original = false)
-{
-
-    try 
-    {
+async function HashItem(db, storeitem, location, original = false) {
+  try {
     itemstore.InitDB(db);
 
-    var filename = path.join(location,storeitem.FileNameOnServer);
+    var filename = path.join(location, storeitem.FileNameOnServer);
 
-    var digest = createSha256FromFile(filename)
+    var digest = createSha256FromFile(filename);
 
-    var  succ = await itemstore.setHash(storeitem.Id, digest, original);
-    
+    var succ = await itemstore.setHash(storeitem.Id, digest, original);
 
-    return {success:succ, item:storeitem,location:location, hash:digest, err: null};
+    return {
+      success: succ,
+      item: storeitem,
+      location: location,
+      hash: digest,
+      err: null,
+    };
+  } catch (err) {
+    return {
+      success: false,
+      item: storeitem,
+      location: location,
+      hash: null,
+      err: err,
+    };
+  }
+}
+
+function createSha256FromFile(filename) {
+  var h = crypto.createHash("sha256",undefined);
+
+  var src = fs.openSync(filename, "r");
+
+  var buf = Buffer.alloc(1024, 0);
+
+  var i = fs.readSync(src, buf, 0, 1024);
+
+  while (i > 0) {
+    if (i < 1024) {
+      h.update(buf.subarray(0, i - 1));
+    } else {
+      h.update(buf);
     }
-    catch (err)
-    {
-        return {success:false, item:storeitem, location:location, hash:null, err:err }
+
+    i = fs.readSync(src, buf, 0, 1024);
+  }
+
+  fs.closeSync(src);
+
+  return h.digest("base64");
+}
+
+function checkHash(hash, file) {
+  var hash2 = createSha256FromFile(file);
+
+  return hash2 == hash;
+}
+
+module.exports = {
+  HashItem,
+  HashItem,
+  CreateSha256: createSha256,
+  CreateSha256FromFile: createSha256FromFile,
+  checkHash: checkHash,
+};
+const crypto = require("crypto");
+const fs = require("fs");
+const { fasttest } = require("./config");
+const path = require("path");
+const itemstore = require("./storemgr/itemstore");
+
+function createSha256(plainstring) {
+
+    var h = crypto.createHash("sha256", {encoding:"binary" });
+
+  h.update(plainstring);
+
+  return h.digest("base64");
+}
+
+async function HashItem(db, storeitem, location, original = false) {
+  try {
+    itemstore.InitDB(db);
+
+    var filename = path.join(location, storeitem.FileNameOnServer);
+
+    var digest = createSha256FromFile(filename);
+
+    var succ = await itemstore.setHash(storeitem.Id, digest, original);
+
+    return {
+      success: succ,
+      item: storeitem,
+      location: location,
+      hash: digest,
+      err: null,
+    };
+  } catch (err) {
+    return {
+      success: false,
+      item: storeitem,
+      location: location,
+      hash: null,
+      err: err,
+    };
+  }
+}
+
+function createSha256FromFile(filename) {
+  var h = crypto.createHash("sha256",undefined);
+
+  var src = fs.openSync(filename, "r");
+
+  var buf = Buffer.alloc(1024, 0);
+
+  var i = fs.readSync(src, buf, 0, 1024);
+
+  while (i > 0) {
+    if (i < 1024) {
+      h.update(buf.subarray(0, i - 1));
+    } else {
+      h.update(buf);
     }
 
+    i = fs.readSync(src, buf, 0, 1024);
+  }
+
+  fs.closeSync(src);
+
+  return h.digest("base64");
 }
 
-function createSha256FromFile(filename)
-{
-    var h = crypto.createHash('sha256')
+function checkHash(hash, file) {
+  var hash2 = createSha256FromFile(file);
 
-    var src = fs.openSync(filename, 'r')
-
-    var buf = Buffer.alloc(1024,0)
-
-    var i = fs.readSync(src,buf,0,1024)
-
-    while (i > 0)
-    {
-
-        if (i < 1024)
-        {
-            h.update(buf.subarray(0,i-1))    
-        }
-        else
-        {   
-            h.update(buf)
-        }
-
-        i = fs.readSync(src,buf,1024)
-    }
-
-    fs.closeSync(src)
-
-    return h.digest('base64')
+  return hash2 == hash;
 }
 
-
-function checkHash(hash, file)
-{
-    var hash2 = createSha256FromFile(file);
-
-    return hash2 == hash
-}
-
-
-module.exports = 
-{
-    HashItem,HashItem,
-    CreateSha256: createSha256,
-    CreateSha256FromFile: createSha256FromFile,
-    checkHash:checkHash
-}
+module.exports = {
+  HashItem,
+  HashItem,
+  CreateSha256: createSha256,
+  CreateSha256FromFile: createSha256FromFile,
+  checkHash: checkHash,
+};
