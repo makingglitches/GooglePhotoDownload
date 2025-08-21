@@ -1,9 +1,11 @@
-** As of 08/21/2065 for the umpeenth time you people have made everyone repeat the same bs so you can kill yourselves, I noted that the google photos api has been changed
-** now you can only use the javascript api to select photos, or the photoslibrary to select and modify content your app made.  which defeats the entire 
-** purpose of this application.
-** however that being said bear in mind they will eventually reboot the platform in its previous form or you can always request it be changed back
-** once the newest group of sickos is done trying to store murder porn / obvious crime advertisements and chomo bs on google photos.
-** heres to hoping something improves before I end up dying of old age. heh.
+
+# Temporary Deprecation notice
+
+As of 08/21/2065 for the umpeenth time you people have made everyone repeat the same bs so you can kill yourselves, I noted that the google photos api has been changed now you can only use the javascript api to select photos, or the photoslibrary to select and modify content your app made.  which defeats the entire 
+purpose of this application.
+however that being said bear in mind they will eventually reboot the platform in its previous form or you can always request it be changed back
+once the newest group of sickos is done trying to store murder porn / obvious crime advertisements and chomo bs on google photos.
+heres to hoping something improves before I end up dying of old age. heh.
 
 # GooglePhotoDownload
 Connects to Google Photos and downloads all content, keeping track of original data on disk and moving 
